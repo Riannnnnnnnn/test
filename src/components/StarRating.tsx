@@ -1,2 +1,0 @@
-import { motion } from 'framer-motion'
-export function StarRating({value,size='md'}:{value:number;size?:'sm'|'md'|'lg'}){return <span className={`stars stars-${size}`} aria-label={`${value}星`}>{[1,2,3,4,5].map(n=><motion.span key={n} className={n<=value?'on':''} initial={n<=value?{scale:0,rotate:-24}:false} animate={{scale:1,rotate:0}} transition={{delay:n*.07,type:'spring',stiffness:420,damping:18}}>★</motion.span>)}</span>}

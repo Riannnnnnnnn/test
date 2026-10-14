@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: children-speech-assessment
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: XFYUN_APP_ID
+        sync: false
+      - key: XFYUN_API_KEY
+        sync: false
+      - key: XFYUN_API_SECRET
+        sync: false

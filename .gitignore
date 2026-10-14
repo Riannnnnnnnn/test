@@ -1,5 +1,14 @@
 node_modules
 dist
-.DS_Store
 *.local
-*.tsbuildinfo
+*.log
+.vite
+.env
+.env.*
+!.env.example
+tmp
+.upload-staging
+
+# 原始输入素材不参与网站构建或云端部署
+/*.zip
+/*.png

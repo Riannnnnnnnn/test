@@ -1,0 +1,30 @@
+:root {
+  --color-purple-950: #24104f;
+  --color-purple-900: #3e198c;
+  --color-purple-800: #5124a8;
+  --color-purple-700: #6336bd;
+  --color-purple-100: #eee7ff;
+  --color-purple-050: #f8f5ff;
+  --color-yellow-500: #ffd44c;
+  --color-yellow-600: #e7b000;
+  --color-gold-400: #ffe071;
+  --color-gold-500: #ffd24a;
+  --color-gold-700: #b87900;
+  --color-orange-500: #ff952b;
+  --color-text: #29243a;
+  --color-muted: #756e89;
+  --color-border: #e7e1f2;
+  --color-surface: #ffffff;
+  --color-danger: #d64545;
+  --shadow-card: 0 18px 52px rgba(49, 24, 103, 0.13);
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --page-width: 1280px;
+  font-size: 17px;
+  font-family: "Source Han Sans CN", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: var(--color-text);
+  background: #f5f1ff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
