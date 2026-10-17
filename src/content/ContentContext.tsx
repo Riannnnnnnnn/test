@@ -27,8 +27,8 @@ function normalizeContent(saved: SiteContent): SiteContent {
       coverImageAlt: ["儿童口才能力评测 IP 角色", "挥手欢迎的 STARVOICE 星光 IP 角色", "正在进行口才测试的 STARVOICE 星光 IP 角色", "拿着麦克风准备开始评测的 STARVOICE 星光 IP 角色", "拿着星级评测板并点赞的 STARVOICE 星光 IP 角色"].includes(saved.home?.coverImageAlt ?? "") ? defaults.home.coverImageAlt : saved.home?.coverImageAlt || defaults.home.coverImageAlt,
     },
     stages: {
-      A: { ...defaults.stages.A, ...saved.stages?.A },
-      B: { ...defaults.stages.B, ...saved.stages?.B },
+      A: { ...defaults.stages.A, ...saved.stages?.A, name: defaults.stages.A.name, tagline: defaults.stages.A.tagline },
+      B: { ...defaults.stages.B, ...saved.stages?.B, name: defaults.stages.B.name, tagline: defaults.stages.B.tagline },
       C: { ...defaults.stages.C, ...saved.stages?.C },
     },
     modules: Object.fromEntries(Object.entries(defaults.modules).map(([id, module]) => {

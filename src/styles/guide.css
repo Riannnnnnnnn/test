@@ -1,0 +1,50 @@
+.guide-backdrop { position: fixed; z-index: 200; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; box-sizing: border-box; display: grid; place-items: center; padding: 24px; background: transparent; animation: guide-dim .35s ease-out both; }
+.guide-backdrop::backdrop { background: rgba(10, 4, 35, .78); backdrop-filter: blur(5px); }
+.guide__body { overflow-y: auto; }
+.guide__eyebrow { padding-right: 65px; }
+@media (max-width: 760px) { .guide-backdrop { padding: 12px; } .guide__foot { flex-wrap: wrap; } .guide__actions { flex-wrap: wrap; } .guide__skip { top: 4px; right: 8px; } .guide__eyebrow { padding-top: 26px; padding-right: 0; } }
+.guide { position: relative; width: min(1000px, 100%); height: min(540px, 100%); display: grid; grid-template-columns: minmax(0, 42fr) minmax(0, 58fr); overflow: hidden; border-radius: 40px; background: #fff; color: var(--color-text); box-shadow: 0 40px 100px rgba(0, 0, 0, .5); animation: guide-sheet .55s cubic-bezier(.3, 1.35, .5, 1) both; }
+.guide__art { position: relative; overflow: hidden; background: radial-gradient(circle at 50% 40%, #7c4fe3, #3b1a8f 70%); }
+.guide__art-inner { position: absolute; inset: 0; animation: guide-visual-in .5s cubic-bezier(.3, 1.4, .5, 1) both; }
+.guide-visual { position: absolute; inset: 0; display: grid; place-items: center; }
+.guide-visual img { max-width: 82%; max-height: 82%; object-fit: contain; filter: drop-shadow(0 18px 24px rgba(10, 3, 40, .45)); }
+.guide-visual__picture { max-width: 70%; max-height: 70%; }
+.guide-float { animation: guide-float 3.2s ease-in-out infinite; }
+.guide-visual--listen img { position: absolute; left: 6%; bottom: 15%; max-width: 78%; max-height: 74%; }
+.guide-visual--blowing img { bottom: 20%; }
+.guide-visual--tiger img { position: absolute; left: 6%; bottom: 18%; max-width: 88%; max-height: 82%; }
+.guide-bubble { position: absolute; right: 6%; top: 14%; max-width: 70%; padding: 14px 24px; border-radius: 30px 30px 30px 6px; background: #fff; color: #3b1a8f; font-size: clamp(26px, 3vw, 40px); font-weight: 900; line-height: 1.25; box-shadow: 0 12px 24px rgba(10, 3, 40, .3); animation: guide-talk 2.4s ease-in-out infinite; transform-origin: 0 100%; }
+.guide-mic { position: relative; width: 160px; height: 160px; display: grid; place-items: center; border-radius: 50%; background: #ff4d6a; box-shadow: 0 9px 0 #b02843; }
+.guide-mic i { position: absolute; inset: 0; border-radius: 50%; border: 3px solid #ff6b81; opacity: 0; animation: guide-ring 2.2s cubic-bezier(.2, .6, .3, 1) infinite; }
+.guide-mic i:nth-child(2) { animation-delay: .73s; }.guide-mic i:nth-child(3) { animation-delay: 1.46s; }
+.guide-visual--stars { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.guide-visual--stars svg { opacity: 0; animation: guide-star 2.8s cubic-bezier(.3, 1.8, .5, 1) infinite; }
+.guide-visual--sequence { display: flex; gap: 12px; padding: 0 20px; }
+.guide-visual--sequence span { flex: 1; aspect-ratio: 1; display: grid; place-items: center; border-radius: 22px; background: #fff; color: #3b1a8f; font-size: 36px; font-weight: 900; animation: guide-float 3s ease-in-out infinite; }
+.guide-visual--sequence span img { max-width: 86%; max-height: 86%; filter: none; }
+.guide__body { position: relative; padding: 44px 52px 40px; display: flex; flex-direction: column; min-width: 0; }
+.guide__skip { position: absolute; right: 26px; top: 22px; min-height: 44px; padding: 0 14px; border: 0; background: transparent; color: #6a6280; font-size: 17px; font-weight: 700; cursor: pointer; }
+.guide__skip:hover { color: var(--color-purple-900); }
+.guide__eyebrow { margin: 0; color: var(--color-purple-800); font-size: 16px; font-weight: 700; letter-spacing: .06em; }
+.guide__text { flex: 1; margin-top: 20px; animation: guide-slide .45s cubic-bezier(.2, .9, .3, 1.1) both; }
+.guide__text h2 { margin: 0; color: var(--color-purple-900); font-size: clamp(34px, 4vw, 50px); line-height: 1.18; }
+.guide__text p { margin: 22px 0 0; font-size: clamp(20px, 2vw, 25px); line-height: 1.7; }
+.guide__foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.guide__dots { display: flex; align-items: center; gap: 10px; }
+.guide__dots span { width: 12px; height: 12px; border-radius: 12px; background: #d9cff2; transition: width .3s cubic-bezier(.3, 1.6, .5, 1), background .3s; }
+.guide__dots span.is-current { width: 34px; background: var(--color-purple-800); }
+.guide__actions { display: flex; gap: 12px; }
+.guide__btn { min-height: 60px; padding: 0 30px; border-radius: 999px; font-size: 20px; font-weight: 900; cursor: pointer; transition: transform .2s cubic-bezier(.3, 1.6, .5, 1); }
+.guide__btn:hover { transform: translateY(-3px); }
+.guide__btn--ghost { border: 2px solid #d9cff2; background: #fff; color: var(--color-purple-900); }
+.guide__btn--primary { min-width: 150px; border: 0; background: var(--color-yellow-500); color: var(--color-purple-900); box-shadow: 0 5px 0 #c58a00; }
+@keyframes guide-dim { from { opacity: 0; } to { opacity: 1; } }
+@keyframes guide-sheet { from { opacity: 0; transform: translateY(40px) scale(.9); } to { opacity: 1; transform: none; } }
+@keyframes guide-slide { from { opacity: 0; transform: translateX(34px); } to { opacity: 1; transform: none; } }
+@keyframes guide-visual-in { from { opacity: 0; transform: scale(.8) rotate(-4deg); } to { opacity: 1; transform: none; } }
+@keyframes guide-float { 50% { transform: translateY(-10px) rotate(1.5deg); } }
+@keyframes guide-talk { 50% { transform: scale(1.08); } }
+@keyframes guide-ring { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(2); opacity: 0; } }
+@keyframes guide-star { 0%, 10% { transform: scale(0); opacity: 0; } 25% { transform: scale(1.5) rotate(12deg); opacity: 1; } 35%, 88% { transform: scale(1); opacity: 1; } 100% { opacity: 0; } }
+@media (max-width: 760px) { .guide { grid-template-columns: 1fr; grid-template-rows: 200px minmax(0, 1fr); height: min(640px, 100%); } .guide__body { padding: 24px 24px 22px; } .guide-visual--blowing img { bottom: 17%; } .guide-visual--tiger img { bottom: 16%; } }
+@media (prefers-reduced-motion: reduce) { .guide-backdrop, .guide, .guide__text, .guide__art-inner, .guide-float, .guide-bubble, .guide-visual--sequence span { animation: none; } .guide-visual--stars svg { animation: none; opacity: 1; } .guide-mic i { animation: none; } }

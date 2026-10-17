@@ -45,6 +45,7 @@ export function ReportPage() {
         id: "shared",
         studentId: sharedStudent.id,
         stage: sharedReport.stage,
+        courseVersion: sharedReport.courseVersion,
         startTime: sharedReport.student.assessmentDate,
         status: "completed",
         results: [{ moduleId: "shared", questionId: "shared", status: "completed", finalScores: sharedReport.abilityValues }],
@@ -69,13 +70,22 @@ export function ReportPage() {
     const buckets: Record<string, number[]> = {};
     session.results.forEach((result) => {
       const scores = result.finalScores ?? result.teacherScores ?? result.autoScores ?? {};
+      if (session.courseVersion === 3 && result.moduleId === "A5") {
+        const observed = [scores.performance, scores.languageExpression].filter((value): value is number => value !== undefined);
+        if (observed.length) (buckets.performance ??= []).push(observed.reduce((sum, value) => sum + value, 0) / observed.length);
+        return;
+      }
       const articulation = ["initialStrength", "vowelFullness", "finalClosure"].map((key) => scores[key]).filter((value): value is number => value !== undefined);
       const breathing = ["sustainedPhonation", "breathContinuity", "voiceStability"].map((key) => scores[key]).filter((value): value is number => value !== undefined);
-      if (result.moduleId === "A1" && articulation.length) (buckets.pronunciationClarity ??= []).push(Math.round(articulation.reduce((sum, value) => sum + value, 0) / articulation.length));
+      if (result.moduleId === "A1" && session.courseVersion === 3 && scores.pronunciationClarity !== undefined) {
+        (buckets.pronunciationClarity ??= []).push(scores.pronunciationClarity);
+      } else if (result.moduleId === "A1" && articulation.length) {
+        (buckets.pronunciationClarity ??= []).push(Math.round(articulation.reduce((sum, value) => sum + value, 0) / articulation.length));
+      }
       if (result.moduleId === "A2" && breathing.length) (buckets.breathAndVoice ??= []).push(Math.round(breathing.reduce((sum, value) => sum + value, 0) / breathing.length));
       Object.entries(scores).filter(([dimension]) => {
         if (["initialStrength", "vowelFullness", "finalClosure", "sustainedPhonation", "breathContinuity", "voiceStability"].includes(dimension)) return false;
-        if (result.moduleId === "A1" && articulation.length && dimension === "pronunciationClarity") return false;
+        if (result.moduleId === "A1" && (articulation.length || session.courseVersion === 3) && dimension === "pronunciationClarity") return false;
         if (result.moduleId === "A2" && breathing.length && dimension === "breathAndVoice") return false;
         return true;
       }).forEach(([dimension, value]) => { (buckets[dimension] ??= []).push(value); });
@@ -83,16 +93,17 @@ export function ReportPage() {
     return Object.fromEntries(Object.entries(buckets).map(([dimension, values]) => [dimension, Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)]));
   }, [session]);
 
-  const measuredValues = Object.values(abilityValues).filter((value) => value > 0);
+  const reportDimensions = session?.courseVersion === 3 ? stageAReportDimensions.filter((id) => ["pronunciationClarity", "breathAndVoice", "performance"].includes(id)) : stageAReportDimensions;
+  const measuredValues = reportDimensions.map((id) => abilityValues[id]).filter((value) => value > 0);
   const average = measuredValues.length ? measuredValues.reduce((sum, value) => sum + value, 0) / measuredValues.length : 0;
   const highest = measuredValues.length ? Math.max(...measuredValues) : 0;
-  const abilities: AbilityView[] = stageAReportDimensions.map((dimension) => {
+  const abilities: AbilityView[] = reportDimensions.map((dimension) => {
     const value = abilityValues[dimension] ?? 0;
     return { dimension, subject: abilityDimensions[dimension], value, band: value ? getAbilityBand(value, highest, average) : "待观察" };
   });
   const grouped = abilities.reduce<Record<string, AbilityView[]>>((result, ability) => { (result[ability.band] ??= []).push(ability); return result; }, {});
   const prominentNames = (grouped["突出能力"] ?? []).map((item) => item.subject);
-  const analyses = stageAReportDimensions.filter((dimension) => abilityValues[dimension] !== undefined).map((dimension) => getDimensionAnalysis(dimension, abilityValues[dimension]));
+  const analyses = reportDimensions.filter((dimension) => abilityValues[dimension] !== undefined).map((dimension) => getDimensionAnalysis(dimension, abilityValues[dimension]));
   const shareUrl = useMemo(() => {
     if (!student || !session) return "";
     const url = new URL("/report/shared", window.location.origin);
@@ -105,6 +116,7 @@ export function ReportPage() {
         assessmentDate: student.assessmentDate,
       },
       stage: session.stage,
+      courseVersion: session.courseVersion,
       abilityValues,
     }));
     return url.toString();

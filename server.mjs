@@ -38,19 +38,21 @@ function createXfyunAuthResponse() {
   const apiSecret = process.env.XFYUN_API_SECRET || "";
   if (!appId || !apiKey || !apiSecret) return null;
 
-  const xfyunHost = "ise-api.xfyun.cn";
-  const xfyunPath = "/v2/open-ise";
-  const date = new Date().toUTCString();
-  const signatureOrigin = `host: ${xfyunHost}\ndate: ${date}\nGET ${xfyunPath} HTTP/1.1`;
-  const signature = createHmac("sha256", apiSecret).update(signatureOrigin).digest("base64");
-  const authorizationOrigin = `api_key="${apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
-  const search = new URLSearchParams({
-    authorization: Buffer.from(authorizationOrigin).toString("base64"),
-    date,
-    host: xfyunHost,
-  });
+  const createUrl = (xfyunHost, xfyunPath) => {
+    const date = new Date().toUTCString();
+    const signatureOrigin = `host: ${xfyunHost}\ndate: ${date}\nGET ${xfyunPath} HTTP/1.1`;
+    const signature = createHmac("sha256", apiSecret).update(signatureOrigin).digest("base64");
+    const authorizationOrigin = `api_key="${apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
+    const search = new URLSearchParams({
+      authorization: Buffer.from(authorizationOrigin).toString("base64"),
+      date,
+      host: xfyunHost,
+    });
 
-  return { appId, url: `wss://${xfyunHost}${xfyunPath}?${search.toString()}` };
+    return `wss://${xfyunHost}${xfyunPath}?${search.toString()}`;
+  };
+
+  return { appId, url: createUrl("ise-api.xfyun.cn", "/v2/open-ise"), iatUrl: createUrl("iat-api.xfyun.cn", "/v2/iat") };
 }
 
 function sendFile(response, filePath, method) {

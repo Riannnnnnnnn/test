@@ -1,8 +1,8 @@
 export const abilityDimensions = {
   pronunciationClarity: "语音清晰度",
-  initialStrength: "字头有力",
-  vowelFullness: "字腹饱满",
-  finalClosure: "字尾收音",
+  initialStrength: "声韵清晰",
+  vowelFullness: "声调自然",
+  finalClosure: "词语准确",
   breathAndVoice: "气息与声音",
   sustainedPhonation: "持续发声",
   breathContinuity: "发声连贯",

@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint .",
-    "test:e2e": "node scripts/e2e-smoke.mjs",
+    "test:e2e": "node scripts/e2e-course.mjs",
     "preview": "vite preview",
     "start": "node server.mjs"
   },

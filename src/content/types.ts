@@ -23,6 +23,7 @@ export interface ModuleContent {
 }
 
 export interface SiteContent {
+  taskOverrides?: Record<string, Partial<{ title: string; text: string; image: string; prompt: string; hint: string }>>;
   brand: { mark: string; name: string; logoImageUrl: string; logoImageAlt: string };
   home: {
     eyebrow: string;

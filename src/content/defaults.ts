@@ -11,8 +11,8 @@ export const defaultSiteContent: SiteContent = {
     coverImageAlt: "双手拿着星级评测板的 STARVOICE 星光 IP 角色",
   },
   stages: {
-    A: { name: "表达启蒙", tagline: "敢说 · 说清 · 听懂 · 排顺 · 敢表现", iconImageUrl: "", iconImageAlt: "A 段表达启蒙" },
-    B: { name: "语言组织", tagline: "发音准确 · 看图组织 · 故事复述 · 情境应答 · 连续表达", iconImageUrl: "", iconImageAlt: "B 段语言组织" },
+    A: { name: "小阶段", tagline: "正音 · 气息 · 表现力", iconImageUrl: "", iconImageAlt: "小阶段" },
+    B: { name: "大阶段", tagline: "句子正音 · 气息控制 · 情境表现", iconImageUrl: "", iconImageAlt: "大阶段" },
     C: { name: "综合表达", tagline: "信息组织 · 临场回应 · 内容生成 · 精准表达", iconImageUrl: "", iconImageAlt: "C 段综合表达" },
   },
   modules: {

@@ -2,6 +2,7 @@ import type { GradeLevel, StageId } from "@/types";
 
 export interface SharedReportPayload {
   version: 1;
+  courseVersion?: 3;
   student: {
     name: string;
     age: number;

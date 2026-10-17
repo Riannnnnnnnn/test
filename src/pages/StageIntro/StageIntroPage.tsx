@@ -10,6 +10,7 @@ import { useAssessmentStore } from "@/stores/assessmentStore";
 import type { AssessmentSession, StageId } from "@/types";
 import { createId } from "@/utils/id";
 import { useSiteContent } from "@/content/useSiteContent";
+import { MicrophoneCheck } from "@/assessment/common/MicrophoneCheck/MicrophoneCheck";
 
 export function StageIntroPage() {
   const { stage: stageParam } = useParams();
@@ -20,7 +21,7 @@ export function StageIntroPage() {
   const setSession = useAssessmentStore((state) => state.setSession);
   const [loading, setLoading] = useState(!student);
   const { content } = useSiteContent();
-  const stage = (stageParam && stageParam in stageConfigs ? stageParam : "A") as StageId;
+  const stage = (stageParam === "B" ? "B" : "A") as StageId;
   const config = stageConfigs[stage];
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export function StageIntroPage() {
   async function startAssessment() {
     if (!student || config.availability !== "available") return;
     const session: AssessmentSession = {
-      id: createId("session"), studentId: student.id, stage, startTime: new Date().toISOString(), status: "running",
+      id: createId("session"), studentId: student.id, stage, courseVersion: 3, startTime: new Date().toISOString(), status: "running",
       results: config.moduleIds.map((moduleId) => ({ moduleId, questionId: `${moduleId}-001`, status: "not_started" })),
     };
     await saveSession(session);
@@ -44,7 +45,7 @@ export function StageIntroPage() {
   if (!student) return <div className="app-shell"><PageContainer><Card><h1>没有找到学生资料</h1><p>请先填写基础信息。</p><Button onClick={() => navigate("/profile")}>返回填写</Button></Card></PageContainer></div>;
 
   return (
-    <div className="app-shell">
+    <div className="app-shell stage-intro-page">
       <PageContainer>
         <PageHeader actions={<Button variant="ghost" size="small" onClick={() => navigate("/profile")}>修改信息</Button>} />
         <Card className="intro-card">
@@ -52,8 +53,9 @@ export function StageIntroPage() {
           <h1>{config.name}</h1><p className="intro-card__lead">{config.description}</p>
           <div className="ability-chips">{config.tagline.map((item) => <span key={item}>{item}</span>)}</div>
           <div className="module-list">
-            {config.moduleIds.map((id, index) => { const editable = id in content.modules ? content.modules[id as keyof typeof content.modules] : undefined; return <div className="module-list__item" key={id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{editable?.menuTitle ?? moduleDefinitions[id].title}</strong><p>{editable?.summary ?? moduleDefinitions[id].summary}</p></div></div>; })}
+            {config.moduleIds.map((id, index) => { const editable = id in content.modules ? content.modules[id as keyof typeof content.modules] : undefined; return <div className="module-list__item" key={id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{({ A1: "正音", A2: "气息", A5: "表现力" } as Record<string, string>)[id] ?? editable?.menuTitle ?? moduleDefinitions[id].title}</strong><p>{id === "A1" ? stage === "A" ? "23 个声母 · 看图读词" : "平翘舌与 d、t、n、l 句子朗读" : id === "A5" ? stage === "A" ? "小老虎、小狗、小鸭模仿" : "森林广播员情境表演" : editable?.summary ?? moduleDefinitions[id].summary}</p></div></div>; })}
           </div>
+          {config.availability === "available" && <MicrophoneCheck />}
           <div className="intro-card__footer">
             <div><strong>{config.moduleIds.length} 个评测项目</strong><p>{config.availability === "available" ? "过程会自动保存，可以中途继续" : "模块定义已经建立，完整交互将在后续阶段开放"}</p></div>
             <Button onClick={startAssessment} disabled={config.availability !== "available"}>{config.availability === "available" ? "开始正式评测" : "本阶段即将开放"}</Button>

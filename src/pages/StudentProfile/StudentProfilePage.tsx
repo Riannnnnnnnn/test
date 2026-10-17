@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { StageBadge } from "@/assessment/common/StageBadge/StageBadge";
 import { PageContainer, PageHeader } from "@/components/layout";
 import { Button, Card, Dialog, Input, Select } from "@/components/ui";
-import { gradeOptions, recommendStage, stageConfigs } from "@/config/stages";
+import { gradeOptions, recommendStage, selectableStageConfigs, stageConfigs } from "@/config/stages";
 import { saveStudent } from "@/services/storage";
 import { useAssessmentStore } from "@/stores/assessmentStore";
 import type { Gender, GradeLevel, StageId, StudentProfile } from "@/types";
@@ -18,6 +18,7 @@ interface FormState {
 }
 
 const initialForm: FormState = { name: "", gender: "", age: "", grade: "" };
+const ageOptions = Array.from({ length: 16 }, (_, index) => ({ value: String(index + 3), label: `${index + 3} 岁` }));
 
 export function StudentProfilePage() {
   const navigate = useNavigate();
@@ -46,7 +47,7 @@ export function StudentProfilePage() {
       return;
     }
     if (!Number.isInteger(age) || age < 3 || age > 18) {
-      setError("年龄请输入 3—18 之间的整数。");
+      setError("请选择 3—18 岁之间的年龄。");
       return;
     }
     setSaving(true);
@@ -87,7 +88,7 @@ export function StudentProfilePage() {
               <div className="form-grid">
                 <Input label="姓名" name="name" required placeholder="请输入孩子姓名" autoComplete="off" value={form.name} onChange={(event) => update("name", event.target.value)} />
                 <Select label="性别" name="gender" required value={form.gender} onChange={(event) => update("gender", event.target.value as Gender)} options={[{ value: "male", label: "男" }, { value: "female", label: "女" }, { value: "other", label: "其他" }]} />
-                <Input label="年龄" name="age" required type="number" min={3} max={18} step={1} placeholder="例如：8" hint="手动填写 3—18 岁" value={form.age} onChange={(event) => update("age", event.target.value)} />
+                <Select label="年龄" name="age" required value={form.age} onChange={(event) => update("age", event.target.value)} options={ageOptions} />
                 <Select label="当前年级" name="grade" required value={form.grade} onChange={(event) => update("grade", event.target.value as GradeLevel)} options={gradeOptions} />
               </div>
 
@@ -103,7 +104,7 @@ export function StudentProfilePage() {
 
       <Dialog open={stageDialogOpen} title="调整评测阶段" onClose={() => setStageDialogOpen(false)}>
         <div className="stage-picker">
-          {(Object.values(stageConfigs)).map((stage) => (
+          {selectableStageConfigs.map((stage) => (
             <button type="button" key={stage.id} className={`stage-picker__option ${activeStage === stage.id ? "is-selected" : ""}`} onClick={() => { setSelectedStage(stage.id); setStageDialogOpen(false); }}>
               <span className={content.stages[stage.id].iconImageUrl ? "has-image" : ""}>{content.stages[stage.id].iconImageUrl ? <img src={content.stages[stage.id].iconImageUrl} alt={content.stages[stage.id].iconImageAlt} /> : stage.id}</span><div><strong>{content.stages[stage.id].name}</strong><small>{content.stages[stage.id].tagline}</small></div>
             </button>

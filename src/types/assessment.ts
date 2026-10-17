@@ -3,6 +3,8 @@ import type { StageId } from "./stage";
 export type ResultStatus = "not_started" | "running" | "completed" | "skipped";
 
 export interface AssessmentResult {
+  activeItemId?: string;
+  items?: Record<string, AssessmentResult>;
   moduleId: string;
   questionId: string;
   startTime?: string;
@@ -18,6 +20,9 @@ export interface AssessmentResult {
 }
 
 export interface AssessmentSession {
+  legacyResults?: AssessmentResult[];
+  tutorialSeen?: string[];
+  courseVersion?: 3;
   id: string;
   studentId: string;
   stage: StageId;

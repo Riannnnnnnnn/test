@@ -17,25 +17,25 @@ export const gradeOptions: Array<{ value: GradeLevel; label: string }> = [
 export const stageConfigs: Record<StageId, StageConfig> = {
   A: {
     id: "A",
-    name: "表达启蒙",
-    fullName: "A段｜表达启蒙",
-    positioning: "建立表达自信与基础表达秩序",
-    description: "通过发音、气息、顺序表达、情境反应和模仿表现，了解孩子是否敢说、能否说清楚。",
-    tagline: ["敢说", "说清", "听懂", "排顺", "敢表现"],
+    name: "小阶段",
+    fullName: "小阶段｜基础表达",
+    positioning: "练习基础正音、气息和模仿表现",
+    description: "通过看图读词、小火车气息练习和动物模仿，观察孩子的基础表达能力。",
+    tagline: ["正音", "气息", "表现力"],
     suitableGrades: ["kindergarten-small", "kindergarten-middle", "kindergarten-large", "preschool"],
-    moduleIds: ["A1", "A2", "A3", "A4", "A5"],
+    moduleIds: ["A1", "A2", "A5"],
     availability: "available",
   },
   B: {
     id: "B",
-    name: "语言组织",
-    fullName: "B段｜语言组织",
-    positioning: "从准确表达走向有序、连续表达",
-    description: "关注发音准确、看图组织、故事复述、情境应答和持续表达。",
-    tagline: ["发音准确", "看图组织", "故事复述", "情境应答", "连续表达"],
-    suitableGrades: ["grade-1", "grade-2", "grade-3"],
-    moduleIds: ["B1", "B2", "B3", "B4", "B5", "B6", "B7"],
-    availability: "configured",
+    name: "大阶段",
+    fullName: "大阶段｜综合表达",
+    positioning: "提升复杂正音、气息控制和情境表现力",
+    description: "通过针对性句子朗读、小火车气息练习和情境表演，观察更完整的表达表现。",
+    tagline: ["句子正音", "气息控制", "情境表现"],
+    suitableGrades: ["grade-1", "grade-2", "grade-3", "grade-4", "grade-5", "grade-6", "middle-school-plus"],
+    moduleIds: ["A1", "A2", "A5"],
+    availability: "available",
   },
   C: {
     id: "C",
@@ -50,10 +50,11 @@ export const stageConfigs: Record<StageId, StageConfig> = {
   },
 };
 
+export const selectableStageConfigs = [stageConfigs.A, stageConfigs.B];
+
 export function recommendStage(grade: GradeLevel): StageId {
   if (stageConfigs.A.suitableGrades.includes(grade)) return "A";
-  if (stageConfigs.B.suitableGrades.includes(grade)) return "B";
-  return "C";
+  return "B";
 }
 
 export function getGradeLabel(grade: GradeLevel): string {

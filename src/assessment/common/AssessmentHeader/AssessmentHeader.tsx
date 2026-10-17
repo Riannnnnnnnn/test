@@ -12,7 +12,7 @@ export function AssessmentHeader({ studentName, stage, moduleId, current, total 
   return (
     <header className="assessment-header">
       <div className="assessment-header__meta"><StageBadge stage={stage} /><span>{studentName}</span></div>
-      <div className="assessment-header__title"><span>{current} / {total}</span><strong>{configuredTitle ?? moduleDefinitions[moduleId]?.title ?? "评测项目"}</strong></div>
+      <div className="assessment-header__title"><span>{current} / {total}</span><strong>{({ A1: "正音", A2: "气息", A5: "表现力" } as Record<string, string>)[moduleId] ?? configuredTitle ?? moduleDefinitions[moduleId]?.title ?? "评测项目"}</strong></div>
       <Progress value={current} max={total} label="评测进度" />
     </header>
   );

@@ -9,6 +9,8 @@ export function InteractionEffects() {
       if (!(event.target instanceof Element)) return;
       const target = event.target.closest<HTMLElement>(interactiveSelector);
       if (!target) return;
+      // The imported guide owns its button animations and absolute skip layout.
+      if (target.closest(".guide")) return;
       playUiClick(target.classList.contains("button--primary") || target.classList.contains("teacher-action--score"));
       target.querySelectorAll(":scope > .interaction-ripple").forEach((staleRipple) => staleRipple.remove());
       const rect = target.getBoundingClientRect();

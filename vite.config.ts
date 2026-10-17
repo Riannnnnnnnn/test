@@ -5,9 +5,7 @@ import react from "@vitejs/plugin-react";
 
 interface XfyunCredentials { appId: string; apiKey: string; apiSecret: string; }
 
-function createXfyunAuthUrl({ apiKey, apiSecret }: XfyunCredentials): string {
-  const host = "ise-api.xfyun.cn";
-  const path = "/v2/open-ise";
+function createXfyunAuthUrl({ apiKey, apiSecret }: XfyunCredentials, host: string, path: string): string {
   const date = new Date().toUTCString();
   const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${path} HTTP/1.1`;
   const signature = createHmac("sha256", apiSecret).update(signatureOrigin).digest("base64");
@@ -30,7 +28,7 @@ function xfyunAuthPlugin(credentials: XfyunCredentials): Plugin {
       response.end(JSON.stringify({ message: "智能语音评星服务暂未就绪。" }));
       return;
     }
-    response.end(JSON.stringify({ appId: credentials.appId, url: createXfyunAuthUrl(credentials) }));
+    response.end(JSON.stringify({ appId: credentials.appId, url: createXfyunAuthUrl(credentials, "ise-api.xfyun.cn", "/v2/open-ise"), iatUrl: createXfyunAuthUrl(credentials, "iat-api.xfyun.cn", "/v2/iat") }));
   };
 
   return {

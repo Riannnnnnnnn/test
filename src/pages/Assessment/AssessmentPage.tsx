@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { AssessmentFooter } from "@/assessment/common/AssessmentFooter/AssessmentFooter";
 import { AssessmentHeader } from "@/assessment/common/AssessmentHeader/AssessmentHeader";
 import { TeacherScoringDialog } from "@/assessment/common/TeacherScoringDialog/TeacherScoringDialog";
@@ -10,10 +10,15 @@ import { stageConfigs } from "@/config/stages";
 import { moduleDefinitions } from "@/config/modules";
 import { getStageAQuestion } from "@/data/questionBank";
 import type { AudioRecording } from "@/services/audio";
-import { mergeFinalScores } from "@/services/scoring";
+import { averageScoreRecords, mergeFinalScores } from "@/services/scoring";
+import { getCourseTasks } from "@/config/courseTasks";
+import type { AssessmentResult } from "@/types";
 import { getSession, getStudent, saveAudio, saveSession } from "@/services/storage";
 import { useAssessmentStore } from "@/stores/assessmentStore";
 import { useSiteContent } from "@/content/useSiteContent";
+import { AssessmentGuide } from "@/assessment/common/AssessmentGuide/AssessmentGuide";
+import "@/styles/course-assessment.css";
+import { upgradeSession } from "@/services/storage/upgradeSession";
 
 export function AssessmentPage() {
   const { sessionId = "", moduleId = "" } = useParams();
@@ -24,13 +29,17 @@ export function AssessmentPage() {
   const setStudent = useAssessmentStore((state) => state.setStudent);
   const [loading, setLoading] = useState(!session);
   const [scoringOpen, setScoringOpen] = useState(false);
+  const [attemptRevision, setAttemptRevision] = useState(0);
+  const [manualGuide, setManualGuide] = useState(false);
   const { content } = useSiteContent();
 
   useEffect(() => {
-    if (session?.id === sessionId) { setLoading(false); return; }
+    if (session?.id === sessionId) { const upgraded = upgradeSession(session); if (upgraded !== session) { setSession(upgraded); void saveSession(upgraded); } setLoading(false); return; }
     getSession(sessionId).then(async (found) => {
       if (found) {
-        setSession(found);
+        const upgraded = upgradeSession(found);
+        setSession(upgraded);
+        if (upgraded !== found) await saveSession(upgraded);
         if (!student) { const owner = await getStudent(found.studentId); if (owner) setStudent(owner); }
       }
       setLoading(false);
@@ -41,19 +50,55 @@ export function AssessmentPage() {
   if (!session) return <div className="app-shell"><PageContainer><Card><h1>评测记录不存在</h1><Button onClick={() => navigate("/profile")}>开始新评测</Button></Card></PageContainer></div>;
 
   const activeSession = session;
-  const modules = stageConfigs[activeSession.stage].moduleIds;
+  const modules = activeSession.courseVersion === 3 ? stageConfigs[activeSession.stage].moduleIds : activeSession.results.map((result) => result.moduleId);
   const index = Math.max(0, modules.indexOf(moduleId));
+  if (!modules.includes(moduleId)) return <Navigate to={`/assessment/${activeSession.id}/${modules[0]}`} replace />;
   const ActiveModule = assessmentModuleRegistry[moduleId];
   const activeResult = activeSession.results.find((result) => result.moduleId === moduleId) ?? { moduleId, questionId: `${moduleId}-001`, status: "not_started" as const };
   const question = getStageAQuestion(moduleId);
+  const tasks = activeSession.courseVersion === 3 ? getCourseTasks(activeSession.stage, moduleId) : [];
+  const selectedTask = tasks.find((task) => task.id === activeResult.activeItemId) ?? tasks[0];
+  const displayResult: AssessmentResult = selectedTask
+    ? activeResult.items?.[selectedTask.id] ?? { moduleId, questionId: selectedTask.id, status: "not_started" }
+    : activeResult;
+  const guideOpen = manualGuide || !activeSession.tutorialSeen?.includes(moduleId);
+
+  async function dismissGuide() {
+    setManualGuide(false);
+    const latest = useAssessmentStore.getState().session;
+    if (!latest || latest.id !== activeSession.id) return;
+    const updated = { ...latest, tutorialSeen: [...new Set([...(latest.tutorialSeen ?? []), moduleId])] };
+    setSession(updated);
+    await saveSession(updated);
+  }
+
+  async function selectItem(id: string) {
+    if (!tasks.some((task) => task.id === id)) return;
+    const latest = useAssessmentStore.getState().session;
+    if (!latest || latest.id !== activeSession.id) return;
+    const updated = { ...latest, results: latest.results.map((result) => result.moduleId === moduleId ? { ...result, activeItemId: id } : result) };
+    setSession(updated);
+    await saveSession(updated);
+  }
 
   async function updateResult(patch: Partial<typeof activeResult>) {
     const latest = useAssessmentStore.getState().session;
     const baseSession = latest?.id === activeSession.id ? latest : activeSession;
     const updated = { ...baseSession, results: baseSession.results.map((result) => {
       if (result.moduleId !== moduleId) return result;
+      if (selectedTask) {
+        const previous = result.items?.[selectedTask.id] ?? { moduleId, questionId: selectedTask.id, status: "not_started" as const };
+        const item = { ...previous, ...patch };
+        item.finalScores = mergeFinalScores(item.autoScores, item.teacherScores);
+        const items = { ...result.items, [selectedTask.id]: item };
+        const values = Object.values(items);
+        return { ...result, items, status: "running" as const,
+          autoScores: averageScoreRecords(values.map((value) => value.autoScores)),
+          teacherScores: averageScoreRecords(values.map((value) => value.teacherScores)),
+          finalScores: averageScoreRecords(values.map((value) => value.finalScores)) };
+      }
       const merged = { ...result, ...patch };
-      if (patch.autoScores || patch.teacherScores) merged.finalScores = mergeFinalScores(merged.autoScores, merged.teacherScores);
+      if ("autoScores" in patch || "teacherScores" in patch) merged.finalScores = mergeFinalScores(merged.autoScores, merged.teacherScores);
       return merged;
     }) };
     setSession(updated);
@@ -70,7 +115,7 @@ export function AssessmentPage() {
     await updateResult({ teacherScores });
   }
 
-  async function retry() { await updateResult({ status: "not_started", startTime: undefined, endTime: undefined, duration: undefined, audioFile: undefined, transcript: undefined, rawResult: undefined, autoScores: undefined, teacherScores: undefined, finalScores: undefined }); }
+  async function retry() { setAttemptRevision((value) => value + 1); await updateResult({ status: "not_started", startTime: undefined, endTime: undefined, duration: undefined, audioFile: undefined, transcript: undefined, rawResult: undefined, autoScores: undefined, teacherScores: undefined, finalScores: undefined }); }
 
   async function finishAndGo(status: "completed" | "skipped" = "completed") {
     const isLastModule = index === modules.length - 1;
@@ -90,16 +135,17 @@ export function AssessmentPage() {
   }
 
   return (
-    <div className="app-shell assessment-page">
+    <div className={`app-shell assessment-page ${activeSession.courseVersion === 3 ? "assessment-page--guided" : ""}`}>
       <PageContainer>
-        <PageHeader actions={<Button variant="ghost" size="small" onClick={() => navigate("/")}>保存并退出</Button>} />
+        <PageHeader actions={<><Button variant="ghost" size="small" onClick={() => { setScoringOpen(false); setManualGuide(true); }}>评测说明</Button><Button variant="ghost" size="small" onClick={() => navigate("/")}>保存并退出</Button></>} />
         <div className="assessment-layout">
           <AssessmentHeader studentName={student?.name ?? "学生"} stage={activeSession.stage} moduleId={moduleId} current={index + 1} total={modules.length} />
-          <section className="assessment-stage">{ActiveModule ? <ActiveModule result={activeResult} onResultChange={updateResult} onRecorded={handleRecorded} /> : <Card><h2>模块准备中</h2><p>该模块已完成配置，交互将在后续阶段开放。</p></Card>}</section>
-          <AssessmentFooter canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(activeResult.teacherScores && Object.keys(activeResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? activeResult.autoScores?.breathAndVoice : activeResult.autoScores?.pronunciationClarity} showIntelligentRating={moduleId === "A1" || moduleId === "A2"} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
+          <section className="assessment-stage">{ActiveModule ? <ActiveModule key={`${moduleId}-${selectedTask?.id ?? "legacy"}-${attemptRevision}`} stage={activeSession.courseVersion === 3 ? activeSession.stage : undefined} items={activeResult.items} onSelectItem={selectItem} result={displayResult} onResultChange={updateResult} onRecorded={handleRecorded} /> : <Card><h2>模块准备中</h2><p>该模块已完成配置，交互将在后续阶段开放。</p></Card>}</section>
+          <AssessmentFooter canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(displayResult.teacherScores && Object.keys(displayResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? displayResult.autoScores?.breathAndVoice : displayResult.autoScores?.pronunciationClarity} showIntelligentRating={false} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
         </div>
       </PageContainer>
-      <TeacherScoringDialog open={scoringOpen} moduleTitle={(moduleId in content.modules ? content.modules[moduleId as keyof typeof content.modules].menuTitle : undefined) ?? moduleDefinitions[moduleId]?.title ?? "评测项目"} dimensions={question?.scoringDimensions ?? []} initialScores={activeResult.teacherScores} onClose={() => setScoringOpen(false)} onSave={saveTeacherScores} />
+      {guideOpen && <AssessmentGuide key={`${sessionId}-${moduleId}`} moduleId={moduleId} large={activeSession.stage !== "A"} onDismiss={() => void dismissGuide()} />}
+      <TeacherScoringDialog open={scoringOpen} moduleTitle={selectedTask?.title ?? (moduleId in content.modules ? content.modules[moduleId as keyof typeof content.modules].menuTitle : undefined) ?? moduleDefinitions[moduleId]?.title ?? "评测项目"} dimensions={question?.scoringDimensions ?? []} initialScores={displayResult.teacherScores} onClose={() => setScoringOpen(false)} onSave={saveTeacherScores} />
     </div>
   );
 }

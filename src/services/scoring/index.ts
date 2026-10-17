@@ -10,7 +10,16 @@ export function mergeFinalScores(autoScores?: Record<string, number>, teacherSco
   return Object.fromEntries([...keys].map((key) => {
     const automatic = autoScores?.[key];
     const teacher = teacherScores?.[key];
-    if (automatic !== undefined && teacher !== undefined) return [key, Math.round(automatic * .4 + teacher * .6)];
+    if (automatic !== undefined && teacher !== undefined) return [key, Math.round((automatic + teacher) / 2)];
     return [key, teacher ?? automatic ?? 0];
   }));
+}
+
+export function averageScoreRecords(records: Array<Record<string, number> | undefined>): Record<string, number> | undefined {
+  const buckets: Record<string, number[]> = {};
+  for (const record of records) for (const [key, score] of Object.entries(record ?? {})) {
+    if (Number.isFinite(score)) (buckets[key] ??= []).push(score);
+  }
+  const entries = Object.entries(buckets).map(([key, scores]) => [key, Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)]);
+  return entries.length ? Object.fromEntries(entries) : undefined;
 }
