@@ -104,6 +104,13 @@ const server = createServer((request, response) => {
     return;
   }
 
+  // 已打开的旧版页面可能仍请求 PNG；直接返回对应 WebP，避免切题时出现空图。
+  const webpFallback = safePath && extname(safePath).toLowerCase() === ".png" ? `${safePath.slice(0, -4)}.webp` : "";
+  if (webpFallback && existsSync(webpFallback) && statSync(webpFallback).isFile()) {
+    sendFile(response, webpFallback, method);
+    return;
+  }
+
   if (!extname(pathname)) {
     sendFile(response, join(distDirectory, "index.html"), method);
     return;
