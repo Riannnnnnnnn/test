@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { ModuleShell } from "@/assessment/common/ModuleShell/ModuleShell";
+import { VoiceConsole } from "@/assessment/common/VoiceConsole/VoiceConsole";
 import type { AssessmentModuleProps } from "@/assessment/types";
 import { useSiteContent } from "@/content/useSiteContent";
 import { BrowserAudioRecorder } from "@/services/audio";
-import { StarRating } from "@/components/ui";
+import { Card } from "@/components/ui";
+import type { CSSProperties } from "react";
 
 type BreathState = "idle" | "connecting" | "recording" | "processing" | "done" | "error";
 
@@ -18,7 +19,7 @@ function stars(score?: number) {
   return value;
 }
 
-export function Breathing({ onResultChange, result, stage }: AssessmentModuleProps) {
+export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
   const { content } = useSiteContent();
   const module = content.modules.A2;
   const recorder = useRef(new BrowserAudioRecorder());
@@ -139,32 +140,31 @@ export function Breathing({ onResultChange, result, stage }: AssessmentModulePro
   }
 
   const active = state === "recording";
-  const voiceprint = Array.from({ length: 38 }, (_, index) => Math.max(12, Math.min(100, 16 + volume * 92 * (0.35 + Math.abs(Math.sin(index * 1.72)) * 0.8))));
   const currentScores = result.autoScores;
   const helperText = active ? `已持续 ${sustainedSeconds.toFixed(1)} 秒 · 中断 ${interruptions} 次` : message;
+  const consoleState = state === "recording" ? "listening" : state;
+  const progress = Math.min(1, Math.max(0, distance / 100));
+  const litSegments = Math.round(Math.min(1, volume * 1.9) * 10);
+  const dimensionItems = breathDimensions.map(({ key, label }) => ({ key, label, done: currentScores?.[key] !== undefined, stars: stars(currentScores?.[key]) }));
+  const micLabel = active ? "正在收音" : state === "connecting" || state === "processing" ? "请稍候" : state === "done" ? "再测一次" : "点击发声";
+  const headline = active ? "正在听你持续发声" : state === "connecting" ? "正在准备收音" : state === "processing" ? "正在分析气息" : state === "done" ? "气息评测完成" : state === "error" ? "没有听到声音，再试一次" : "准备好就出发";
+  const sceneStyle = { "--p": progress.toFixed(4), "--lv": Math.min(1, volume * 1.6).toFixed(3) } as CSSProperties;
 
-  const visual = <div className="breathing-game">
-    <div className="sound-meter"><span style={{ width: `${Math.max(4, volume * 100)}%` }} /></div>
-    <div className="train-track"><span className={`train ${module.imageUrl ? "train--image" : ""} ${volume > .08 ? "is-moving" : ""}`} style={{ left: `calc(${Math.min(73, distance * .73)}% - 8px)` }}>{module.imageUrl ? <><img src={module.imageUrl} alt={module.imageAlt} /><span className="train-smoke train-smoke--one" aria-hidden="true" /><span className="train-smoke train-smoke--two" aria-hidden="true" /><span className="train-smoke train-smoke--three" aria-hidden="true" /></> : <><i />{module.visualText}</>}</span><span className="station" aria-label={module.secondaryText}><span className="station__flag"><i aria-hidden="true" />{module.secondaryText}</span><span className="station__pole" aria-hidden="true" /><span className="station__base" aria-hidden="true" /></span></div>
-    <p className="breathing-sound">{module.visualText}</p>
-  </div>;
-
-  return <ModuleShell hideCopy={Boolean(stage)} className={stage ? "course-breathing" : ""} eyebrow={module.eyebrow} title={module.title} prompt={module.prompt} visual={visual}>
-    <div className={`smart-evaluator smart-evaluator--featured smart-evaluator--mic breathing-evaluator ${active ? "is-listening" : ""}`}>
-      <div className="smart-evaluator__mic-wrap">
-        <button type="button" className="smart-evaluator__mic" disabled={active || state === "connecting" || state === "processing"} onClick={start} aria-label={active ? "正在自动评测气息" : "开始气息评测"}>
-          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 17v5m-4 0h8" /></svg>
-        </button>
-        <strong className="smart-evaluator__mic-label">{active ? "正在收音" : state === "done" ? "再测一次" : "点击发声"}</strong>
+  return <Card className={`pro-card breath ${active ? "is-active" : ""} ${volume > .08 ? "is-voiced" : ""}`}>
+    <div className="breath__scene" style={sceneStyle}>
+      <div className="breath__hud">
+        <div className="breath-stat breath-stat--main"><span>持续发声</span><strong><b>{sustainedSeconds.toFixed(1)}</b><small>秒</small></strong><em className="breath-stat__goal"><i style={{ width: `${Math.min(100, sustainedSeconds / 12 * 100)}%` }} /></em></div>
+        <div className="breath-stat"><span>中断次数</span><strong><b>{interruptions}</b><small>次</small></strong></div>
+        <div className="breath-stat breath-stat--level"><span>音量</span><div className="breath-led" aria-hidden="true">{Array.from({ length: 10 }, (_, index) => <i key={index} className={index < litSegments ? "is-lit" : ""} />)}</div></div>
       </div>
-      <div className="smart-evaluator__body" aria-live="polite">
-        <div className="smart-evaluator__headline"><strong>{active ? "正在听你持续发声" : state === "done" ? "气息评测完成" : "准备好就出发"}</strong><span>{sustainedSeconds.toFixed(1)}s</span></div>
-        <div className={`smart-evaluator__voiceprint ${active ? "is-listening" : "is-idle"} ${volume > .08 ? "has-sound" : ""}`} aria-label={active ? "正在识别声音" : "语音声纹"}>{voiceprint.map((height, index) => <i key={index} style={{ height: `${height}%`, animationDelay: `${index * -.055}s`, animationDuration: `${.88 + (index % 6) * .075}s` }} />)}</div>
-        {helperText && <small>{helperText}</small>}
-      </div>
-      <div className="smart-evaluator__dimensions" aria-label="三个维度的智能评星">
-        {breathDimensions.map(({ key, label }) => <div className={`smart-evaluator__dimension ${currentScores?.[key] !== undefined ? "is-complete" : ""}`} key={key}><span>{label}</span><strong aria-label={`${label}智能评星`}><StarRating value={stars(currentScores?.[key])} /></strong></div>)}
+      <div className="breath__cue" aria-hidden="true"><span>{module.visualText}</span></div>
+      <div className="breath__track">
+        <div className="breath__rail"><span className="breath__trail" /></div>
+        {[3, 6, 9].map((second) => <span className="breath__mark" key={second} style={{ "--k": second / 12 } as CSSProperties}><i />{second}s</span>)}
+        <span className={`breath__train ${module.imageUrl ? "has-image" : ""} ${volume > .08 ? "is-moving" : ""}`}>{module.imageUrl ? <><img src={module.imageUrl} alt={module.imageAlt} /><span className="breath__speed" aria-hidden="true"><i /><i /><i /></span><span className="train-smoke train-smoke--one" aria-hidden="true" /><span className="train-smoke train-smoke--two" aria-hidden="true" /><span className="train-smoke train-smoke--three" aria-hidden="true" /></> : <><i />{module.visualText}</>}</span>
+        <span className={`breath__goal ${progress >= 1 ? "is-reached" : ""}`} aria-label={module.secondaryText}><span className="breath__flag">{module.secondaryText}</span><span className="breath__pole" aria-hidden="true" /></span>
       </div>
     </div>
-  </ModuleShell>;
+    <VoiceConsole className="breath__console" state={consoleState} level={volume} timer={`${sustainedSeconds.toFixed(1)}s`} headline={headline} hint={helperText} micLabel={micLabel} micAria={active ? "正在自动评测气息" : "开始气息评测"} onStart={start} dimensions={dimensionItems} dimensionsAria="三个维度的智能评星" />
+  </Card>;
 }

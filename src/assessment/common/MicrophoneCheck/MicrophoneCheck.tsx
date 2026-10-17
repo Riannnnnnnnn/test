@@ -3,9 +3,13 @@ import { Button } from "@/components/ui";
 
 type Status = "idle" | "requesting" | "listening" | "success" | "error";
 
-export function MicrophoneCheck() {
+interface MicrophoneCheckProps {
+  onPassedChange: (passed: boolean) => void;
+}
+
+export function MicrophoneCheck({ onPassedChange }: MicrophoneCheckProps) {
   const [status, setStatus] = useState<Status>("idle");
-  const [message, setMessage] = useState("正式评测前，先说一句“你好”，检查是否能收到声音。");
+  const [message, setMessage] = useState("正式评测前，请先检查麦克风是否正常。对着麦克风发出声音即可。");
   const [level, setLevel] = useState(0);
   const generation = useRef(0);
   const release = useRef<() => void>(() => {});
@@ -15,6 +19,7 @@ export function MicrophoneCheck() {
   function stop() {
     generation.current += 1;
     release.current();
+    onPassedChange(false);
     setLevel(0);
     setStatus("idle");
     setMessage("已停止测试，可以重新测试麦克风。");
@@ -23,6 +28,7 @@ export function MicrophoneCheck() {
   async function start() {
     const run = ++generation.current;
     release.current();
+    onPassedChange(false);
     setLevel(0);
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
       setStatus("error");
@@ -47,7 +53,7 @@ export function MicrophoneCheck() {
       audio = new AudioContext();
       await audio.resume();
       if (run !== generation.current) { cleanup(); return; }
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       if (run !== generation.current) { cleanup(); return; }
       const analyser = audio.createAnalyser();
       analyser.fftSize = 1024;
@@ -55,13 +61,14 @@ export function MicrophoneCheck() {
       const samples = new Float32Array(analyser.fftSize);
       let soundSince = 0;
       setStatus("listening");
-      setMessage("请说一句“你好”，观察下方音量条是否变化。");
+      setMessage("请对着麦克风发出声音，观察下方音量条是否变化。");
       const finish = (next: Status, text: string) => {
         if (run !== generation.current) return;
         cleanup();
         setLevel(0);
         setStatus(next);
         setMessage(text);
+        onPassedChange(next === "success");
       };
       timer = window.setTimeout(() => finish("error", "暂未收到明显声音，请靠近麦克风说话，检查系统输入音量或设备后重试。"), 10000);
       const sample = () => {
@@ -94,7 +101,7 @@ export function MicrophoneCheck() {
       <strong>{status === "success" ? "✓ 麦克风正常" : "麦克风测试"}</strong>
       <p role="status">{message}</p>
       {status === "listening" && <div className="microphone-check__meter" role="meter" aria-label="麦克风输入音量" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level)}><span style={{ width: `${level}%` }} /></div>}
-      <small>仅检测收音，不保存录音。也可直接开始，由老师手动评分。</small>
+      <small>仅检测收音，不保存录音。收到声音后才能开始正式评测。</small>
     </div>
     <Button variant="secondary" onClick={active ? stop : start}>{active ? "停止测试" : status === "idle" ? "测试麦克风" : "重新测试麦克风"}</Button>
   </section>;

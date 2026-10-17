@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { StarRating } from "@/components/ui";
+import { VoiceConsole } from "@/assessment/common/VoiceConsole/VoiceConsole";
 import { SmartEvaluationUnavailableError, SpeechContentMismatchError, prepareSpeechAuth, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
 import { strictPronunciationStars } from "@/services/scoring/pronunciation";
 
@@ -31,7 +31,7 @@ const dimensions = [
   { key: "finalClosure", label: "词语准确" },
 ];
 
-export function SmartSpeechEvaluator({ referenceText, initialScore, initialPreview = false, dimensionRatings, featured = false, sentence = false, strictRating = false, onReset, onEvaluated }: SmartSpeechEvaluatorProps) {
+export function SmartSpeechEvaluator({ referenceText, initialScore, initialPreview = false, dimensionRatings, sentence = false, strictRating = false, onReset, onEvaluated }: SmartSpeechEvaluatorProps) {
   const mounted = useRef(true);
   const session = useRef<XfyunIseSession | undefined>(undefined);
   const listening = useRef(false);
@@ -45,7 +45,6 @@ export function SmartSpeechEvaluator({ referenceText, initialScore, initialPrevi
   const [error, setError] = useState("");
   const [errorKind, setErrorKind] = useState<"mismatch" | "general" | "">("");
   const [isPreview, setIsPreview] = useState(initialPreview);
-  const voiceprint = Array.from({ length: 38 }, (_, index) => Math.max(12, Math.min(100, 16 + volume * 92 * (0.35 + Math.abs(Math.sin(index * 1.72)) * 0.8))));
   const volumeChanged = (value: number) => {
     setVolume((current) => current * .58 + value * .42);
     if (!listening.current || autoFinishing.current) return;
@@ -149,34 +148,19 @@ export function SmartSpeechEvaluator({ referenceText, initialScore, initialPrevi
   const isBusy = state === "connecting" || state === "processing";
   const isListening = state === "listening";
   const isDone = state === "done";
-  const microphoneLabel = isListening ? "正在自动识别" : isBusy ? "正在处理语音" : isDone ? "重新智能评测" : "开始智能评测";
-  const helperText = isPreview ? "智能服务未就绪，请使用教师评价" : isListening ? "正在收音" : state === "connecting" ? "正在连接麦克风与语音服务" : state === "processing" ? "正在生成评分" : isDone ? "评测完成" : "";
+  const micLabel = isListening ? "正在识别" : isBusy ? "请稍候" : isDone ? "再测一次" : "点击说话";
+  const micAria = isListening ? "正在自动识别" : isBusy ? "正在处理语音" : isDone ? "重新智能评测" : "开始智能评测";
+  const headline = isListening ? "正在听你说话" : state === "connecting" ? "正在准备收音" : state === "processing" ? "正在分析声音" : isDone ? "本次表达观察" : state === "error" ? "没有听清，再来一次" : "准备好就说出来";
+  const hint = isPreview ? "智能服务未就绪，请使用教师评价" : isListening ? "说完后停顿一下，系统会自动结束" : state === "connecting" ? "正在连接麦克风与语音服务" : state === "processing" ? "正在生成评分" : isDone ? "评测完成" : "";
+  const dimensionItems = dimensions.map(({ key, label }) => {
+    const score = dimensionRatings?.[key];
+    return { key, label, done: score !== undefined, stars: strictRating ? strictPronunciationStars(score) : getStars(score) };
+  });
 
-  return <div className={`smart-evaluator smart-evaluator--mic ${featured ? "smart-evaluator--featured" : ""} ${isListening ? "is-listening" : ""}`}>
-    <div className="smart-evaluator__mic-wrap">
-      <button type="button" className="smart-evaluator__mic" disabled={isBusy || isListening} onPointerEnter={() => { void prepareSpeechAuth().catch(() => undefined); }} onFocus={() => { void prepareSpeechAuth().catch(() => undefined); }} onClick={start} aria-label={microphoneLabel} title={microphoneLabel}>
-        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 17v5m-4 0h8" /></svg>
-      </button>
-      <strong className="smart-evaluator__mic-label">{isListening ? "正在识别" : isDone ? "再测一次" : "点击说话"}</strong>
-    </div>
-    <div className="smart-evaluator__body" aria-live="polite">
-      <div className="smart-evaluator__headline"><strong>{isListening ? "正在听你说话" : state === "connecting" ? "正在准备收音" : state === "processing" ? "正在分析声音" : isDone ? "本次表达观察" : "准备好就说出来"}</strong><span>{formatTime(seconds)}</span></div>
-      <div className={`smart-evaluator__voiceprint ${isListening ? "is-listening" : "is-idle"} ${volume > .08 ? "has-sound" : ""}`} aria-label={isListening ? "正在识别声音" : "语音声纹"}>{voiceprint.map((height, index) => <i key={index} style={{ height: `${height}%`, animationDelay: `${index * -.055}s`, animationDuration: `${.88 + (index % 6) * .075}s` }} />)}</div>
-      {helperText && <small>{helperText}</small>}
-    </div>
-    <div className="smart-evaluator__dimensions" aria-label="三个维度的智能评星">
-      {dimensions.map(({ key, label }) => {
-        const score = dimensionRatings?.[key];
-        const stars = strictRating ? strictPronunciationStars(score) : getStars(score);
-        return <div className={`smart-evaluator__dimension ${score !== undefined ? "is-complete" : ""}`} key={key}>
-          <span>{label}</span>
-          <strong aria-label={score !== undefined ? `${label}${stars}颗星` : `${label}待评测`}><StarRating value={stars} /></strong>
-        </div>;
-      })}
-    </div>
-    {error && <div className={`smart-evaluator__error ${errorKind === "mismatch" ? "smart-evaluator__error--mismatch" : ""}`} role="alert">
-      <button type="button" className="smart-evaluator__error-retry" onClick={start} aria-label="重新评测" title="重新评测"><img src="/assets/icons/refresh.svg" alt="" /><strong>{errorKind === "mismatch" ? "再试一次" : "重新评测"}</strong></button>
+  return <VoiceConsole state={state} level={volume} timer={formatTime(seconds)} headline={headline} hint={hint} micLabel={micLabel} micAria={micAria} onStart={start} onPrepare={() => { void prepareSpeechAuth().catch(() => undefined); }} dimensions={dimensionItems} dimensionsAria="三个维度的智能评星">
+    {error && <div className={`vc__error ${errorKind === "mismatch" ? "vc__error--mismatch" : ""}`} role="alert">
+      <button type="button" className="vc__error-retry" onClick={start} aria-label="重新评测" title="重新评测"><img src="/assets/icons/refresh.svg" alt="" /><strong>{errorKind === "mismatch" ? "再试一次" : "重新评测"}</strong></button>
       <small>{error}</small>
     </div>}
-  </div>;
+  </VoiceConsole>;
 }

@@ -22,10 +22,13 @@ export function StageIntroPage() {
   const setSession = useAssessmentStore((state) => state.setSession);
   const [loading, setLoading] = useState(!student);
   const [starting, setStarting] = useState(false);
+  const [microphonePassedFor, setMicrophonePassedFor] = useState("");
   const [imageError, setImageError] = useState("");
   const { content } = useSiteContent();
   const stage = (stageParam === "B" ? "B" : "A") as StageId;
   const config = stageConfigs[stage];
+  const microphoneCheckKey = `${student?.id ?? ""}:${stage}`;
+  const microphonePassed = microphonePassedFor === microphoneCheckKey;
 
   useEffect(() => {
     const studentId = searchParams.get("student");
@@ -39,7 +42,7 @@ export function StageIntroPage() {
   }, [config.moduleIds, content, stage]);
 
   async function startAssessment() {
-    if (!student || config.availability !== "available") return;
+    if (!student || config.availability !== "available" || !microphonePassed) return;
     setStarting(true);
     setImageError("");
     const firstImage = assessmentImageUrls(stage, config.moduleIds[0], content)[0];
@@ -71,10 +74,10 @@ export function StageIntroPage() {
           <div className="module-list">
             {config.moduleIds.map((id, index) => { const editable = id in content.modules ? content.modules[id as keyof typeof content.modules] : undefined; return <div className="module-list__item" key={id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{({ A1: "正音", A2: "气息", A5: "表现力" } as Record<string, string>)[id] ?? editable?.menuTitle ?? moduleDefinitions[id].title}</strong><p>{id === "A1" ? stage === "A" ? "23 个声母 · 看图读词" : "平翘舌与 d、t、n、l 句子朗读" : id === "A5" ? stage === "A" ? "小老虎、小狗、小鸭模仿" : "森林广播员情境表演" : editable?.summary ?? moduleDefinitions[id].summary}</p></div></div>; })}
           </div>
-          {config.availability === "available" && <MicrophoneCheck />}
+          {config.availability === "available" && <MicrophoneCheck key={microphoneCheckKey} onPassedChange={(passed) => setMicrophonePassedFor(passed ? microphoneCheckKey : "")} />}
           <div className="intro-card__footer">
-            <div><strong>{config.moduleIds.length} 个评测项目</strong><p>{config.availability === "available" ? "过程会自动保存，可以中途继续" : "模块定义已经建立，完整交互将在后续阶段开放"}</p></div>
-            <Button onClick={startAssessment} disabled={starting || config.availability !== "available"}>{starting ? "正在准备评测…" : config.availability === "available" ? "开始正式评测" : "本阶段即将开放"}</Button>
+            <div><strong>{config.moduleIds.length} 个评测项目</strong><p>{config.availability === "available" ? microphonePassed ? "麦克风测试已通过，过程会自动保存" : "请先测试麦克风，通过后即可开始评测" : "模块定义已经建立，完整交互将在后续阶段开放"}</p></div>
+            <Button onClick={startAssessment} disabled={starting || config.availability !== "available" || !microphonePassed}>{starting ? "正在准备评测…" : config.availability === "available" ? "开始正式评测" : "本阶段即将开放"}</Button>
           </div>
           {imageError && <p className="assessment-image-error" role="alert">{imageError}</p>}
         </Card>

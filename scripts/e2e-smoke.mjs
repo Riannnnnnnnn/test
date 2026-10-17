@@ -121,9 +121,11 @@ try {
   }), "较矮桌面窗口的阶段介绍页无滚动条且底部按钮完整可见");
   await page.setViewportSize({ width: 1920, height: 1080 });
 
+  check(await page.getByRole("button", { name: "开始正式评测" }).isDisabled(), "未通过麦克风测试时不能开始正式评测");
   await page.getByRole("button", { name: "测试麦克风", exact: true }).click();
   await page.locator(".microphone-check--success").waitFor();
   check(await page.getByText("✓ 麦克风正常", { exact: true }).isVisible(), "评测前麦克风测试能够检测真实音频输入");
+  check(await page.getByRole("button", { name: "开始正式评测" }).isEnabled(), "麦克风测试通过后解锁正式评测");
   await page.evaluate(() => {
     globalThis.__originalGetUserMedia = navigator.mediaDevices.getUserMedia;
     navigator.mediaDevices.getUserMedia = async () => { throw new DOMException("Denied", "NotAllowedError"); };
@@ -131,7 +133,10 @@ try {
   await page.getByRole("button", { name: "重新测试麦克风" }).click();
   await page.locator(".microphone-check--error").waitFor();
   check((await page.locator(".microphone-check").textContent()).includes("麦克风权限未开启"), "麦克风授权失败时显示可操作提示");
+  check(await page.getByRole("button", { name: "开始正式评测" }).isDisabled(), "重新测试失败后重新锁定正式评测");
   await page.evaluate(() => { navigator.mediaDevices.getUserMedia = globalThis.__originalGetUserMedia; });
+  await page.getByRole("button", { name: "重新测试麦克风" }).click();
+  await page.locator(".microphone-check--success").waitFor();
   await page.getByRole("button", { name: "开始正式评测" }).click();
   await page.waitForURL(/\/assessment\/.+\/A1/);
   await page.getByRole("heading", { name: "后台测试看图说词" }).waitFor();

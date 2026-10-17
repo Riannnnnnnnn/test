@@ -28,13 +28,15 @@ export function Pronunciation({ onResultChange, result, stage, items, onSelectIt
       rawResult: { ...result.rawResult, provider: "smart-speech", intelligentStars: calibrated?.stars ?? evaluation.stars, speechSessionId: evaluation.sessionId, transcript: evaluation.transcript, pronunciationScore: evaluation.pronunciationScore, toneScore: evaluation.toneScore, evaluatedAt: new Date().toISOString() } });
   };
   const resetEvaluation = () => onResultChange({ status: "running", autoScores: undefined, teacherScores: undefined, transcript: undefined, rawResult: undefined });
-  return <Card className={`module-card pronunciation-card ${selected ? "course-pronunciation" : ""}`}>
-    <div className="pronunciation-card__question">
+  const initialLabel = stage === "A" && selected?.title.startsWith("声母 ") ? selected.title.replace("声母 ", "") : undefined;
+  return <Card className={`pro-card pron ${stage === "B" ? "pron--sentence" : ""}`}>
+    <div className="pron__picker">
       {selected ? <TaskPicker tasks={tasks} selectedId={selected.id} items={items} onSelect={onSelectItem} initials={stage === "A"} /> : <><p className="eyebrow">{module.eyebrow}</p><h2>{module.title}</h2><p>{module.prompt}</p></>}
     </div>
-    <div className={`pronunciation-card__picture ${stage === "B" ? "pronunciation-card__picture--sentence" : ""}`}>
-      {stage !== "B" && <div className="pronunciation-card__art">{picture}</div>}
-      <div className="pronunciation-card__word" aria-label={word}>
+    <div className="pron__stage">
+      {stage !== "B" && <div className="pron__art" key={`art-${selected?.id ?? "legacy"}`}><span className="pron__halo" aria-hidden="true" /><span className="pron__orbit" aria-hidden="true" />{picture}</div>}
+      <div className="pron__word" aria-label={word} key={`word-${selected?.id ?? "legacy"}`}>
+        {selected && <span className="pron__tag">{initialLabel ? <><em>目标声母</em><b>{initialLabel}</b></> : <em>{selected.title}</em>}</span>}
         {selected ? <strong className={stage === "B" ? "course-sentence" : "course-word"}>{word}</strong> : <div className="pronunciation-card__syllables">
           {characters.map((character, index) => <div className="pronunciation-card__syllable" key={`${character}-${index}`}>
             <span>{pinyin[index]}</span><strong>{character}</strong>
@@ -42,6 +44,6 @@ export function Pronunciation({ onResultChange, result, stage, items, onSelectIt
         </div>}
       </div>
     </div>
-    <div className="pronunciation-card__interaction"><SmartSpeechEvaluator featured strictRating={Boolean(stage)} sentence={stage === "B"} referenceText={word} initialScore={result.autoScores?.pronunciationClarity} initialPreview={result.rawResult?.provider === "smart-preview"} dimensionRatings={result.autoScores} onReset={resetEvaluation} onEvaluated={saveEvaluation} /></div>
+    <div className="pron__console"><SmartSpeechEvaluator featured strictRating={Boolean(stage)} sentence={stage === "B"} referenceText={word} initialScore={result.autoScores?.pronunciationClarity} initialPreview={result.rawResult?.provider === "smart-preview"} dimensionRatings={result.autoScores} onReset={resetEvaluation} onEvaluated={saveEvaluation} /></div>
   </Card>;
 }
