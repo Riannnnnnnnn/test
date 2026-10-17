@@ -19,6 +19,7 @@ import { useSiteContent } from "@/content/useSiteContent";
 import { AssessmentGuide } from "@/assessment/common/AssessmentGuide/AssessmentGuide";
 import "@/styles/course-assessment.css";
 import { upgradeSession } from "@/services/storage/upgradeSession";
+import { assessmentImageUrls, preloadImage, preloadImages } from "@/services/assets/preloadImages";
 
 export function AssessmentPage() {
   const { sessionId = "", moduleId = "" } = useParams();
@@ -31,7 +32,10 @@ export function AssessmentPage() {
   const [scoringOpen, setScoringOpen] = useState(false);
   const [attemptRevision, setAttemptRevision] = useState(0);
   const [manualGuide, setManualGuide] = useState(false);
+  const [imageError, setImageError] = useState("");
   const { content } = useSiteContent();
+  const assessmentStage = session?.stage;
+  const assessmentVersion = session?.courseVersion;
 
   useEffect(() => {
     if (session?.id === sessionId) { const upgraded = upgradeSession(session); if (upgraded !== session) { setSession(upgraded); void saveSession(upgraded); } setLoading(false); return; }
@@ -45,6 +49,13 @@ export function AssessmentPage() {
       setLoading(false);
     });
   }, [session, sessionId, setSession, setStudent, student]);
+
+  useEffect(() => {
+    if (!assessmentStage) return;
+    const ids = assessmentVersion === 3 ? stageConfigs[assessmentStage].moduleIds : [moduleId];
+    const current = Math.max(0, ids.indexOf(moduleId));
+    void preloadImages(ids.slice(current, current + 2).flatMap((id) => assessmentImageUrls(assessmentStage, id, content)));
+  }, [assessmentVersion, assessmentStage, moduleId, content]);
 
   if (loading) return <div className="app-shell"><PageContainer><p className="loading-state">正在恢复评测进度…</p></PageContainer></div>;
   if (!session) return <div className="app-shell"><PageContainer><Card><h1>评测记录不存在</h1><Button onClick={() => navigate("/profile")}>开始新评测</Button></Card></PageContainer></div>;
@@ -73,7 +84,13 @@ export function AssessmentPage() {
   }
 
   async function selectItem(id: string) {
-    if (!tasks.some((task) => task.id === id)) return;
+    const target = tasks.find((task) => task.id === id);
+    if (!target) return;
+    if (!(await preloadImage(content.taskOverrides?.[target.id]?.image ?? target.image))) {
+      setImageError("图片暂时没有加载好，请检查网络后再点一次。");
+      return;
+    }
+    setImageError("");
     const latest = useAssessmentStore.getState().session;
     if (!latest || latest.id !== activeSession.id) return;
     const updated = { ...latest, results: latest.results.map((result) => result.moduleId === moduleId ? { ...result, activeItemId: id } : result) };
@@ -141,6 +158,7 @@ export function AssessmentPage() {
         <div className="assessment-layout">
           <AssessmentHeader studentName={student?.name ?? "学生"} stage={activeSession.stage} moduleId={moduleId} current={index + 1} total={modules.length} />
           <section className="assessment-stage">{ActiveModule ? <ActiveModule key={`${moduleId}-${selectedTask?.id ?? "legacy"}-${attemptRevision}`} stage={activeSession.courseVersion === 3 ? activeSession.stage : undefined} items={activeResult.items} onSelectItem={selectItem} result={displayResult} onResultChange={updateResult} onRecorded={handleRecorded} /> : <Card><h2>模块准备中</h2><p>该模块已完成配置，交互将在后续阶段开放。</p></Card>}</section>
+          {imageError && <p className="assessment-image-error" role="alert">{imageError}</p>}
           <AssessmentFooter canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(displayResult.teacherScores && Object.keys(displayResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? displayResult.autoScores?.breathAndVoice : displayResult.autoScores?.pronunciationClarity} showIntelligentRating={false} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
         </div>
       </PageContainer>

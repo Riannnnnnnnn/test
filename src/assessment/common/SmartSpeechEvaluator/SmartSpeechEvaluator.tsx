@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { StarRating } from "@/components/ui";
-import { SmartEvaluationUnavailableError, SpeechContentMismatchError, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
+import { SmartEvaluationUnavailableError, SpeechContentMismatchError, prepareSpeechAuth, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
 import { strictPronunciationStars } from "@/services/scoring/pronunciation";
 
 interface SmartSpeechEvaluatorProps {
@@ -64,6 +64,7 @@ export function SmartSpeechEvaluator({ referenceText, initialScore, initialPrevi
   };
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; listening.current = false; window.clearTimeout(maximumTimer.current); session.current?.cancel(); }; }, []);
+  useEffect(() => { void prepareSpeechAuth().catch(() => undefined); }, [referenceText]);
   useEffect(() => {
     if (initialScore !== undefined || initialPreview || state !== "done") return;
     setState("idle");
@@ -114,7 +115,7 @@ export function SmartSpeechEvaluator({ referenceText, initialScore, initialPrevi
           return;
         }
       }
-      setError("暂时无法开启语音评星，请检查网络和麦克风权限后再试。");
+      setError(reason instanceof DOMException && reason.name === "NotAllowedError" ? "请先允许使用麦克风，再重新评测。" : "语音服务连接失败。请检查网络；若反复出现，请管理员核对讯飞服务配置。");
       setErrorKind("general");
       setState("error");
     }
@@ -149,17 +150,17 @@ export function SmartSpeechEvaluator({ referenceText, initialScore, initialPrevi
   const isListening = state === "listening";
   const isDone = state === "done";
   const microphoneLabel = isListening ? "正在自动识别" : isBusy ? "正在处理语音" : isDone ? "重新智能评测" : "开始智能评测";
-  const helperText = isPreview ? "智能服务未就绪，请使用教师评价" : isListening ? "正在收音" : isBusy ? "正在生成评分" : isDone ? "评测完成" : "";
+  const helperText = isPreview ? "智能服务未就绪，请使用教师评价" : isListening ? "正在收音" : state === "connecting" ? "正在连接麦克风与语音服务" : state === "processing" ? "正在生成评分" : isDone ? "评测完成" : "";
 
   return <div className={`smart-evaluator smart-evaluator--mic ${featured ? "smart-evaluator--featured" : ""} ${isListening ? "is-listening" : ""}`}>
     <div className="smart-evaluator__mic-wrap">
-      <button type="button" className="smart-evaluator__mic" disabled={isBusy || isListening} onClick={start} aria-label={microphoneLabel} title={microphoneLabel}>
+      <button type="button" className="smart-evaluator__mic" disabled={isBusy || isListening} onPointerEnter={() => { void prepareSpeechAuth().catch(() => undefined); }} onFocus={() => { void prepareSpeechAuth().catch(() => undefined); }} onClick={start} aria-label={microphoneLabel} title={microphoneLabel}>
         <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 17v5m-4 0h8" /></svg>
       </button>
       <strong className="smart-evaluator__mic-label">{isListening ? "正在识别" : isDone ? "再测一次" : "点击说话"}</strong>
     </div>
     <div className="smart-evaluator__body" aria-live="polite">
-      <div className="smart-evaluator__headline"><strong>{isListening ? "正在听你说话" : isBusy ? "正在分析声音" : isDone ? "本次表达观察" : "准备好就说出来"}</strong><span>{formatTime(seconds)}</span></div>
+      <div className="smart-evaluator__headline"><strong>{isListening ? "正在听你说话" : state === "connecting" ? "正在准备收音" : state === "processing" ? "正在分析声音" : isDone ? "本次表达观察" : "准备好就说出来"}</strong><span>{formatTime(seconds)}</span></div>
       <div className={`smart-evaluator__voiceprint ${isListening ? "is-listening" : "is-idle"} ${volume > .08 ? "has-sound" : ""}`} aria-label={isListening ? "正在识别声音" : "语音声纹"}>{voiceprint.map((height, index) => <i key={index} style={{ height: `${height}%`, animationDelay: `${index * -.055}s`, animationDuration: `${.88 + (index % 6) * .075}s` }} />)}</div>
       {helperText && <small>{helperText}</small>}
     </div>

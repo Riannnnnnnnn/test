@@ -16,7 +16,26 @@ interface StartOptions {
   onVolume?: (volume: number) => void;
 }
 
-interface AuthResponse { appId: string; url: string; iatUrl?: string; message?: string; }
+interface AuthResponse { appId: string; url: string; iatUrl: string; message?: string; }
+
+let authCache: { expiresAt: number; promise: Promise<AuthResponse> } | undefined;
+
+function getSpeechAuth(): Promise<AuthResponse> {
+  if (authCache && Date.now() < authCache.expiresAt) return authCache.promise;
+  const promise = fetch("/api/xfyun/ise-auth", { cache: "no-store" }).then(async (response) => {
+    const auth = await response.json() as AuthResponse;
+    if (response.status === 503) throw new SmartEvaluationUnavailableError(auth.message || "智能语音评星服务暂未就绪。");
+    if (!response.ok || !auth.appId || !auth.url || !auth.iatUrl) throw new Error(auth.message || "智能语音评星暂时无法开启。");
+    return auth;
+  });
+  authCache = { expiresAt: Date.now() + 45_000, promise };
+  void promise.catch(() => { if (authCache?.promise === promise) authCache = undefined; });
+  return promise;
+}
+
+export function prepareSpeechAuth(): Promise<void> {
+  return getSpeechAuth().then(() => undefined);
+}
 
 export interface XfyunIseSession {
   stop: () => Promise<XfyunIseResult>;
@@ -119,12 +138,16 @@ export function parseXfyunIseResult(rawXml: string, sessionId?: string): XfyunIs
 }
 
 export async function startXfyunIse({ referenceText, category = "read_word", onVolume }: StartOptions): Promise<XfyunIseSession> {
-  const authResponse = await fetch("/api/xfyun/ise-auth", { cache: "no-store" });
-  const auth = await authResponse.json() as AuthResponse;
-  if (authResponse.status === 503) throw new SmartEvaluationUnavailableError(auth.message || "智能语音评星服务暂未就绪。");
-  if (!authResponse.ok || !auth.appId || !auth.url || !auth.iatUrl) throw new Error(auth.message || "智能语音评星暂时无法开启。");
-
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const authRequest = getSpeechAuth();
+  const streamRequest = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  let auth: AuthResponse;
+  let stream: MediaStream;
+  try {
+    [auth, stream] = await Promise.all([authRequest, streamRequest]);
+  } catch (reason) {
+    void streamRequest.then((opened) => opened.getTracks().forEach((track) => track.stop()), () => undefined);
+    throw reason;
+  }
   const audioContext = new AudioContext();
   const source = audioContext.createMediaStreamSource(stream);
   const processor = audioContext.createScriptProcessor(4096, 1, 1);

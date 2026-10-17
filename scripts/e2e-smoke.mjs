@@ -304,7 +304,7 @@ try {
   check(await page.getByRole("button", { name: "历史测评" }).count() === 0, "首页不再显示历史报告入口");
   await page.goto(`${baseUrl}/assessment/${sessionId}/A1`);
   await page.locator(".pronunciation-card__picture .module-uploaded-image img").waitFor();
-  check((await page.locator(".pronunciation-card__picture .module-uploaded-image img").getAttribute("src"))?.endsWith("/assets/v2/questions/a1-apple-v3.png"), "默认题目使用新的卡通苹果图片");
+  check((await page.locator(".pronunciation-card__picture .module-uploaded-image img").getAttribute("src"))?.endsWith("/assets/v2/questions/a1-apple-v3.webp"), "默认题目使用新的卡通苹果图片");
   const defaultWordLayout = await page.locator(".pronunciation-card__word").evaluate((element) => ({ label: element.getAttribute("aria-label"), text: element.textContent?.replace(/\s/g, "") ?? "", syllables: element.querySelectorAll(".pronunciation-card__syllable").length }));
   check(defaultWordLayout.label === "苹果" && defaultWordLayout.text.includes("píng") && defaultWordLayout.text.includes("guǒ") && defaultWordLayout.syllables === 2, "默认题图右侧按 MasterGo 核心内容布局逐字显示拼音和汉字");
   check(await page.getByText("不播放标准读音。请让孩子看图后自然说出名称。").count() === 0, "A1 不再显示旧提示语");
@@ -357,7 +357,7 @@ try {
   await page.screenshot({ path: v3DogScreenshotPath, fullPage: true });
   process.stdout.write(`新版小狗题截图：${v3DogScreenshotPath}\n`);
   await page.getByRole("button", { name: "小鸭" }).click();
-  await page.waitForFunction(() => { const image = document.querySelector(".v3-animal-card img"); return image instanceof HTMLImageElement && image.src.endsWith("/assets/v3/animals/duck.png") && image.complete && image.naturalWidth > 0; });
+  await page.waitForFunction(() => { const image = document.querySelector(".v3-animal-card img"); return image instanceof HTMLImageElement && image.src.endsWith("/assets/v3/animals/duck.webp") && image.complete && image.naturalWidth > 0; });
   check(await page.locator(".v3-animal-card img").evaluate((image) => image.complete && image.naturalWidth > 0), "小鸭配图正常加载");
   await page.locator(".v3-nav button").nth(1).click();
   await page.evaluate(() => { globalThis.__speechSilenceAfterMs = 1200; });

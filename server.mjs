@@ -20,6 +20,7 @@ const mimeTypes = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".webp": "image/webp",
+  ".webp": "image/webp",
   ".woff": "font/woff",
   ".woff2": "font/woff2",
 };
@@ -57,8 +58,9 @@ function createXfyunAuthResponse() {
 
 function sendFile(response, filePath, method) {
   const extension = extname(filePath).toLowerCase();
+  const hashedBundle = /-[A-Za-z0-9_-]{8,}\.(js|css)$/.test(filePath);
   response.writeHead(200, {
-    "Cache-Control": extension === ".html" ? "no-cache" : "public, max-age=31536000, immutable",
+    "Cache-Control": extension === ".html" ? "no-cache" : hashedBundle ? "public, max-age=31536000, immutable" : "public, max-age=3600",
     "Content-Type": mimeTypes[extension] || "application/octet-stream",
   });
   if (method === "HEAD") response.end();

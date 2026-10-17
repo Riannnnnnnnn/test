@@ -10,18 +10,18 @@ export interface CourseTask {
 }
 
 export const smallPronunciationTasks: CourseTask[] = [
-  ["b", "包子", "/assets/v3/words/b.png"], ["p", "苹果", "/assets/v2/questions/a1-apple-v3.png"],
-  ["m", "帽子", "/assets/v3/words/m.png"], ["f", "飞机", "/assets/v3/words/f.png"],
-  ["d", "灯笼", "/assets/v3/words/d.png"], ["t", "兔子", "/assets/v3/words/t.png"],
-  ["n", "奶牛", "/assets/v3/words/n.png"], ["l", "老虎", "/assets/v2/questions/a5-tiger-v3.png"],
-  ["g", "公鸡", "/assets/v3/words/g.png"], ["k", "恐龙", "/assets/v3/words/k.png"],
-  ["h", "花朵", "/assets/v3/words/h.png"], ["j", "鸡蛋", "/assets/v3/words/j.png"],
-  ["q", "气球", "/assets/v3/words/q.png"], ["x", "西瓜", "/assets/v3/words/x.png"],
-  ["zh", "蜘蛛", "/assets/v3/words/zh.png"], ["ch", "车子", "/assets/v3/words/ch.png"],
-  ["sh", "狮子", "/assets/v3/words/sh.png"], ["r", "热气球", "/assets/v3/words/r.png"],
-  ["z", "足球", "/assets/v3/words/z.png"], ["c", "草莓", "/assets/v3/words/c.png"],
-  ["s", "扫帚", "/assets/v3/words/s.png"], ["y", "月亮", "/assets/v3/words/y.png"],
-  ["w", "乌龟", "/assets/v3/words/w.png"],
+  ["b", "包子", "/assets/v3/words/b.webp"], ["p", "苹果", "/assets/v2/questions/a1-apple-v3.webp"],
+  ["m", "帽子", "/assets/v3/words/m.webp"], ["f", "飞机", "/assets/v3/words/f.webp"],
+  ["d", "灯笼", "/assets/v3/words/d.webp"], ["t", "兔子", "/assets/v3/words/t.webp"],
+  ["n", "奶牛", "/assets/v3/words/n.webp"], ["l", "老虎", "/assets/v2/questions/a5-tiger-v3.webp"],
+  ["g", "公鸡", "/assets/v3/words/g.webp"], ["k", "恐龙", "/assets/v3/words/k.webp"],
+  ["h", "花朵", "/assets/v3/words/h.webp"], ["j", "鸡蛋", "/assets/v3/words/j.webp"],
+  ["q", "气球", "/assets/v3/words/q.webp"], ["x", "西瓜", "/assets/v3/words/x.webp"],
+  ["zh", "蜘蛛", "/assets/v3/words/zh.webp"], ["ch", "车子", "/assets/v3/words/ch.webp"],
+  ["sh", "狮子", "/assets/v3/words/sh.webp"], ["r", "热气球", "/assets/v3/words/r.webp"],
+  ["z", "足球", "/assets/v3/words/z.webp"], ["c", "草莓", "/assets/v3/words/c.webp"],
+  ["s", "扫帚", "/assets/v3/words/s.webp"], ["y", "月亮", "/assets/v3/words/y.webp"],
+  ["w", "乌龟", "/assets/v3/words/w.webp"],
 ].map(([id, text, image]) => ({ id: `A1-${id}`, projectId: "A1", title: `声母 ${id}`, text: text!, image: image! }));
 
 export const largePronunciationTasks: CourseTask[] = [
@@ -30,9 +30,9 @@ export const largePronunciationTasks: CourseTask[] = [
 ];
 
 export const smallExpressionTasks: CourseTask[] = [
-  { id: "A5-tiger", projectId: "A5", title: "小老虎", text: "嗷呜", image: "/assets/v2/questions/a5-tiger-v3.png", prompt: "像小老虎一样神气地吼一声，再向前迈一步。" },
-  { id: "A5-dog", projectId: "A5", title: "小狗", text: "汪汪", image: "/assets/v3/animals/dog.png", prompt: "像小狗一样开心地叫两声，摇摇尾巴。" },
-  { id: "A5-duck", projectId: "A5", title: "小鸭", text: "嘎嘎", image: "/assets/v3/animals/duck.png", prompt: "像小鸭一样清脆地叫两声，拍拍翅膀。" },
+  { id: "A5-tiger", projectId: "A5", title: "小老虎", text: "嗷呜", image: "/assets/v2/questions/a5-tiger-v3.webp", prompt: "像小老虎一样神气地吼一声，再向前迈一步。" },
+  { id: "A5-dog", projectId: "A5", title: "小狗", text: "汪汪", image: "/assets/v3/animals/dog.webp", prompt: "像小狗一样开心地叫两声，摇摇尾巴。" },
+  { id: "A5-duck", projectId: "A5", title: "小鸭", text: "嘎嘎", image: "/assets/v3/animals/duck.webp", prompt: "像小鸭一样清脆地叫两声，拍拍翅膀。" },
 ];
 
 export const largeExpressionTask: CourseTask = {

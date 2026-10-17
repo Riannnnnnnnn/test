@@ -20,7 +20,7 @@ async function imageFileToDataUrl(file: File): Promise<string> {
     canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
     canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
     canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL(file.type === "image/png" ? "image/png" : "image/jpeg", .86);
+    return canvas.toDataURL("image/webp", .86);
   } finally {
     URL.revokeObjectURL(source);
   }
@@ -39,7 +39,7 @@ function ImageEditor({ label, value, alt, onChange }: { label: string; value: st
     try { onChange(await imageFileToDataUrl(file)); } catch { setError("图片读取失败，请换一张图片重试。 "); }
     event.target.value = "";
   };
-  return <div className="admin-image-editor"><div className="admin-image-editor__preview">{value ? <img src={value} alt={alt} /> : <span>暂无图片<br /><small>前台使用默认图形</small></span>}</div><div><strong>{label}</strong><p>支持 JPG、PNG 等常见格式，上传后自动压缩并保存。</p><label className="button button--secondary admin-upload">选择图片<input type="file" accept="image/*" onChange={choose} /></label>{value && <Button type="button" variant="danger" size="small" onClick={() => onChange("")}>移除图片</Button>}{error && <span className="field__error">{error}</span>}</div></div>;
+  return <div className="admin-image-editor"><div className="admin-image-editor__preview">{value ? <img src={value} alt={alt} /> : <span>暂无图片<br /><small>前台使用默认图形</small></span>}</div><div><strong>{label}</strong><p>支持 JPG、PNG 等常见格式，上传后自动转为 WebP 压缩保存。</p><label className="button button--secondary admin-upload">选择图片<input type="file" accept="image/*" onChange={choose} /></label>{value && <Button type="button" variant="danger" size="small" onClick={() => onChange("")}>移除图片</Button>}{error && <span className="field__error">{error}</span>}</div></div>;
 }
 
 export function ContentAdminPage() {

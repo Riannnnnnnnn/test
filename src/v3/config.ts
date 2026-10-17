@@ -9,29 +9,29 @@ export interface InitialQuestion {
 
 // 常见普通话声母教学口径：21 个辅音声母，加 y、w，共 23 个。
 export const initialQuestions: InitialQuestion[] = [
-  { initial: "b", word: "包子", picture: "/assets/v3/words/b.png" },
-  { initial: "p", word: "苹果", picture: "/assets/v2/questions/a1-apple-v3.png" },
-  { initial: "m", word: "帽子", picture: "/assets/v3/words/m.png" },
-  { initial: "f", word: "飞机", picture: "/assets/v3/words/f.png" },
-  { initial: "d", word: "灯笼", picture: "/assets/v3/words/d.png" },
-  { initial: "t", word: "兔子", picture: "/assets/v3/words/t.png" },
-  { initial: "n", word: "奶牛", picture: "/assets/v3/words/n.png" },
-  { initial: "l", word: "老虎", picture: "/assets/v2/questions/a5-tiger-v3.png" },
-  { initial: "g", word: "公鸡", picture: "/assets/v3/words/g.png" },
-  { initial: "k", word: "恐龙", picture: "/assets/v3/words/k.png" },
-  { initial: "h", word: "花朵", picture: "/assets/v3/words/h.png" },
-  { initial: "j", word: "鸡蛋", picture: "/assets/v3/words/j.png" },
-  { initial: "q", word: "气球", picture: "/assets/v3/words/q.png" },
-  { initial: "x", word: "西瓜", picture: "/assets/v3/words/x.png" },
-  { initial: "zh", word: "蜘蛛", picture: "/assets/v3/words/zh.png" },
-  { initial: "ch", word: "车子", picture: "/assets/v3/words/ch.png" },
-  { initial: "sh", word: "狮子", picture: "/assets/v3/words/sh.png" },
-  { initial: "r", word: "热气球", picture: "/assets/v3/words/r.png" },
-  { initial: "z", word: "足球", picture: "/assets/v3/words/z.png" },
-  { initial: "c", word: "草莓", picture: "/assets/v3/words/c.png" },
-  { initial: "s", word: "扫帚", picture: "/assets/v3/words/s.png" },
-  { initial: "y", word: "月亮", picture: "/assets/v3/words/y.png" },
-  { initial: "w", word: "乌龟", picture: "/assets/v3/words/w.png" },
+  { initial: "b", word: "包子", picture: "/assets/v3/words/b.webp" },
+  { initial: "p", word: "苹果", picture: "/assets/v2/questions/a1-apple-v3.webp" },
+  { initial: "m", word: "帽子", picture: "/assets/v3/words/m.webp" },
+  { initial: "f", word: "飞机", picture: "/assets/v3/words/f.webp" },
+  { initial: "d", word: "灯笼", picture: "/assets/v3/words/d.webp" },
+  { initial: "t", word: "兔子", picture: "/assets/v3/words/t.webp" },
+  { initial: "n", word: "奶牛", picture: "/assets/v3/words/n.webp" },
+  { initial: "l", word: "老虎", picture: "/assets/v2/questions/a5-tiger-v3.webp" },
+  { initial: "g", word: "公鸡", picture: "/assets/v3/words/g.webp" },
+  { initial: "k", word: "恐龙", picture: "/assets/v3/words/k.webp" },
+  { initial: "h", word: "花朵", picture: "/assets/v3/words/h.webp" },
+  { initial: "j", word: "鸡蛋", picture: "/assets/v3/words/j.webp" },
+  { initial: "q", word: "气球", picture: "/assets/v3/words/q.webp" },
+  { initial: "x", word: "西瓜", picture: "/assets/v3/words/x.webp" },
+  { initial: "zh", word: "蜘蛛", picture: "/assets/v3/words/zh.webp" },
+  { initial: "ch", word: "车子", picture: "/assets/v3/words/ch.webp" },
+  { initial: "sh", word: "狮子", picture: "/assets/v3/words/sh.webp" },
+  { initial: "r", word: "热气球", picture: "/assets/v3/words/r.webp" },
+  { initial: "z", word: "足球", picture: "/assets/v3/words/z.webp" },
+  { initial: "c", word: "草莓", picture: "/assets/v3/words/c.webp" },
+  { initial: "s", word: "扫帚", picture: "/assets/v3/words/s.webp" },
+  { initial: "y", word: "月亮", picture: "/assets/v3/words/y.webp" },
+  { initial: "w", word: "乌龟", picture: "/assets/v3/words/w.webp" },
 ];
 
 export const sentenceQuestions = [
@@ -40,9 +40,9 @@ export const sentenceQuestions = [
 ] as const;
 
 export const animalQuestions = [
-  { id: "tiger", title: "小老虎", sound: "嗷呜", cue: "像小老虎一样神气地吼一声，再向前迈一步。", image: "/assets/v2/questions/a5-tiger-v3.png" },
-  { id: "dog", title: "小狗", sound: "汪汪", cue: "像小狗一样开心地叫两声，摇摇尾巴。", image: "/assets/v3/animals/dog.png" },
-  { id: "duck", title: "小鸭", sound: "嘎嘎", cue: "像小鸭一样清脆地叫两声，拍拍翅膀。", image: "/assets/v3/animals/duck.png" },
+  { id: "tiger", title: "小老虎", sound: "嗷呜", cue: "像小老虎一样神气地吼一声，再向前迈一步。", image: "/assets/v2/questions/a5-tiger-v3.webp" },
+  { id: "dog", title: "小狗", sound: "汪汪", cue: "像小狗一样开心地叫两声，摇摇尾巴。", image: "/assets/v3/animals/dog.webp" },
+  { id: "duck", title: "小鸭", sound: "嘎嘎", cue: "像小鸭一样清脆地叫两声，拍拍翅膀。", image: "/assets/v3/animals/duck.webp" },
 ] as const;
 
 export const largeExpressionPrompt = {

@@ -170,7 +170,7 @@ function BreathTask({ id, rating, onRating }: { id: string; rating?: Rating; onR
 
   return <div className="v3-breath">
     <h2>气息 · 小火车</h2><p>深吸一口气，持续发出“呜——”。停声约 2 秒或火车到站后会自动出成绩。</p>
-    <div className="v3-train-scene"><div className="v3-train-progress"><span style={{ width: `${distance}%` }} /></div><img className="v3-train" style={{ left: `calc(${Math.min(75, distance * .75)}% - 5px)` }} src="/assets/v2/questions/a2-train-v3.png" alt="正在前进的小火车" /><div className="v3-rail" /><strong className="v3-station">终点</strong></div>
+    <div className="v3-train-scene"><div className="v3-train-progress"><span style={{ width: `${distance}%` }} /></div><img className="v3-train" style={{ left: `calc(${Math.min(75, distance * .75)}% - 5px)` }} src="/assets/v2/questions/a2-train-v3.webp" alt="正在前进的小火车" /><div className="v3-rail" /><strong className="v3-station">终点</strong></div>
     <div className="v3-speech-controls"><button type="button" className="v3-primary" disabled={state === "recording"} onClick={start}>{state === "recording" ? "正在听你发声…" : rating ? "再测一次" : "按下麦克风出发"}</button><div className="v3-volume"><span style={{ width: `${Math.max(4, volume * 100)}%` }} /></div>{rating && stars(rating.stars)}</div>
     {message && <p className="v3-feedback" role="status">{message}</p>}
     <TeacherRating value={rating} onRate={(value) => onRating(id, { score: value * 20, stars: value, source: "teacher", note: "教师评星" })} />

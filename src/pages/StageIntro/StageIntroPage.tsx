@@ -11,6 +11,7 @@ import type { AssessmentSession, StageId } from "@/types";
 import { createId } from "@/utils/id";
 import { useSiteContent } from "@/content/useSiteContent";
 import { MicrophoneCheck } from "@/assessment/common/MicrophoneCheck/MicrophoneCheck";
+import { assessmentImageUrls, preloadImage, preloadImages } from "@/services/assets/preloadImages";
 
 export function StageIntroPage() {
   const { stage: stageParam } = useParams();
@@ -20,6 +21,8 @@ export function StageIntroPage() {
   const setStudent = useAssessmentStore((state) => state.setStudent);
   const setSession = useAssessmentStore((state) => state.setSession);
   const [loading, setLoading] = useState(!student);
+  const [starting, setStarting] = useState(false);
+  const [imageError, setImageError] = useState("");
   const { content } = useSiteContent();
   const stage = (stageParam === "B" ? "B" : "A") as StageId;
   const config = stageConfigs[stage];
@@ -30,8 +33,21 @@ export function StageIntroPage() {
     else setLoading(false);
   }, [searchParams, setStudent, student]);
 
+  useEffect(() => {
+    const urls = config.moduleIds.flatMap((id) => assessmentImageUrls(stage, id, content));
+    void preloadImage(urls[0]).then(() => preloadImages(urls.slice(1)));
+  }, [config.moduleIds, content, stage]);
+
   async function startAssessment() {
     if (!student || config.availability !== "available") return;
+    setStarting(true);
+    setImageError("");
+    const firstImage = assessmentImageUrls(stage, config.moduleIds[0], content)[0];
+    if (!(await preloadImage(firstImage))) {
+      setImageError("题目图片暂时没有加载好，请检查网络后再试一次。");
+      setStarting(false);
+      return;
+    }
     const session: AssessmentSession = {
       id: createId("session"), studentId: student.id, stage, courseVersion: 3, startTime: new Date().toISOString(), status: "running",
       results: config.moduleIds.map((moduleId) => ({ moduleId, questionId: `${moduleId}-001`, status: "not_started" })),
@@ -58,8 +74,9 @@ export function StageIntroPage() {
           {config.availability === "available" && <MicrophoneCheck />}
           <div className="intro-card__footer">
             <div><strong>{config.moduleIds.length} 个评测项目</strong><p>{config.availability === "available" ? "过程会自动保存，可以中途继续" : "模块定义已经建立，完整交互将在后续阶段开放"}</p></div>
-            <Button onClick={startAssessment} disabled={config.availability !== "available"}>{config.availability === "available" ? "开始正式评测" : "本阶段即将开放"}</Button>
+            <Button onClick={startAssessment} disabled={starting || config.availability !== "available"}>{starting ? "正在准备评测…" : config.availability === "available" ? "开始正式评测" : "本阶段即将开放"}</Button>
           </div>
+          {imageError && <p className="assessment-image-error" role="alert">{imageError}</p>}
         </Card>
       </PageContainer>
     </div>

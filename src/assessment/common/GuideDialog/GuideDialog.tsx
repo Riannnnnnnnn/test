@@ -11,12 +11,12 @@ function GuideVisualPane({ step, moduleId }: { step: GuideStep; moduleId: string
   switch (step.visual) {
     case "listen":
       return <div className={`guide-visual guide-visual--listen ${moduleId === "A2" ? "guide-visual--blowing" : ""}`}>
-        <img className="guide-float" src={moduleId === "A2" ? "/assets/v2/star-mascot-guide-blowing-mic-natural.png" : "/assets/v2/star-mascot-hero-assessment.png"} alt="" />
+        <img className="guide-float" src={moduleId === "A2" ? "/assets/v2/star-mascot-guide-blowing-mic-natural.webp" : "/assets/v2/star-mascot-hero-assessment.webp"} alt="" />
         {step.bubble && <div className="guide-bubble">{step.bubble}</div>}
       </div>;
     case "tiger":
       return <div className="guide-visual guide-visual--tiger">
-        <img className="guide-float" src="/assets/v2/star-mascot-guide-tiger.png" alt="" />
+        <img className="guide-float" src="/assets/v2/star-mascot-guide-tiger.webp" alt="" />
       </div>;
     case "mic":
       return <div className="guide-visual guide-visual--mic">
@@ -29,11 +29,11 @@ function GuideVisualPane({ step, moduleId }: { step: GuideStep; moduleId: string
         {[0, 1, 2, 3, 4].map((i) => <svg key={i} viewBox="0 0 60 52" width="64" height="56" style={{ animationDelay: `${i * 0.25}s` }}><path d="M30 3l7.3 15.3 16.7 2.1-12.3 11.5 3.2 16.6L30 40.1 15.1 48.5l3.2-16.6L6 20.4l16.7-2.1z" fill={i < 4 ? "#ffd44c" : "rgba(255,255,255,.35)"} stroke={i < 4 ? "#ffd44c" : "rgba(255,255,255,.35)"} strokeWidth="5" strokeLinejoin="round" /></svg>)}
       </div>;
     case "image":
-      return <div className="guide-visual">{module?.imageUrl ? <img className="guide-float guide-visual__picture" src={module.imageUrl} alt="" /> : <img className="guide-float" src="/assets/v2/star-mascot-hero-board.png" alt="" />}</div>;
+      return <div className="guide-visual">{module?.imageUrl ? <img className="guide-float guide-visual__picture" src={module.imageUrl} alt="" /> : <img className="guide-float" src="/assets/v2/star-mascot-hero-board.webp" alt="" />}</div>;
     case "sequence":
       return <div className="guide-visual guide-visual--sequence">{(module?.sequenceItems ?? []).map((item, i) => <span key={item.key} style={{ animationDelay: `${i * 0.18}s` }}>{item.imageUrl ? <img src={item.imageUrl} alt="" /> : item.symbol}</span>)}</div>;
     default:
-      return <div className="guide-visual"><img className="guide-float" src="/assets/v2/star-mascot-hero-board.png" alt="" /></div>;
+      return <div className="guide-visual"><img className="guide-float" src="/assets/v2/star-mascot-hero-board.webp" alt="" /></div>;
   }
 }
 

@@ -8,40 +8,46 @@ function cloneDefaults(): SiteContent {
   return structuredClone(defaultSiteContent);
 }
 
+function webpBuiltInImage(url?: string): string | undefined {
+  return url?.replace(/^(\/assets\/.*)\.png$/i, "$1.webp");
+}
+
 function normalizeContent(saved: SiteContent): SiteContent {
   const defaults = cloneDefaults();
-  const legacyCoverImages = ["/assets/v2/ip-character.png", "/assets/v2/star-mascot-hero.png", "/assets/v2/star-mascot-hero-half.png", "/assets/v2/star-mascot-hero-ready.png", "/assets/v2/star-mascot-hero-assessment.png"];
-  const savedCoverImageUrl = legacyCoverImages.includes(saved.home?.coverImageUrl ?? "") ? defaults.home.coverImageUrl : saved.home?.coverImageUrl;
+  const legacyCoverImages = ["/assets/v2/ip-character.webp", "/assets/v2/star-mascot-hero.webp", "/assets/v2/star-mascot-hero-half.webp", "/assets/v2/star-mascot-hero-ready.webp", "/assets/v2/star-mascot-hero-assessment.webp"];
+  const savedCoverImageUrl = webpBuiltInImage(saved.home?.coverImageUrl);
   return {
     ...defaults,
     ...saved,
+    taskOverrides: saved.taskOverrides && Object.fromEntries(Object.entries(saved.taskOverrides).map(([id, override]) =>
+      [id, { ...override, image: webpBuiltInImage(override.image) }])),
     brand: {
       ...defaults.brand,
       ...saved.brand,
-      logoImageUrl: saved.brand?.logoImageUrl || defaults.brand.logoImageUrl,
+      logoImageUrl: webpBuiltInImage(saved.brand?.logoImageUrl) || defaults.brand.logoImageUrl,
     },
     home: {
       ...defaults.home,
       ...saved.home,
-      coverImageUrl: savedCoverImageUrl || defaults.home.coverImageUrl,
+      coverImageUrl: legacyCoverImages.includes(savedCoverImageUrl ?? "") ? defaults.home.coverImageUrl : savedCoverImageUrl || defaults.home.coverImageUrl,
       coverImageAlt: ["儿童口才能力评测 IP 角色", "挥手欢迎的 STARVOICE 星光 IP 角色", "正在进行口才测试的 STARVOICE 星光 IP 角色", "拿着麦克风准备开始评测的 STARVOICE 星光 IP 角色", "拿着星级评测板并点赞的 STARVOICE 星光 IP 角色"].includes(saved.home?.coverImageAlt ?? "") ? defaults.home.coverImageAlt : saved.home?.coverImageAlt || defaults.home.coverImageAlt,
     },
     stages: {
-      A: { ...defaults.stages.A, ...saved.stages?.A, name: defaults.stages.A.name, tagline: defaults.stages.A.tagline },
-      B: { ...defaults.stages.B, ...saved.stages?.B, name: defaults.stages.B.name, tagline: defaults.stages.B.tagline },
-      C: { ...defaults.stages.C, ...saved.stages?.C },
+      A: { ...defaults.stages.A, ...saved.stages?.A, iconImageUrl: webpBuiltInImage(saved.stages?.A?.iconImageUrl) || defaults.stages.A.iconImageUrl, name: defaults.stages.A.name, tagline: defaults.stages.A.tagline },
+      B: { ...defaults.stages.B, ...saved.stages?.B, iconImageUrl: webpBuiltInImage(saved.stages?.B?.iconImageUrl) || defaults.stages.B.iconImageUrl, name: defaults.stages.B.name, tagline: defaults.stages.B.tagline },
+      C: { ...defaults.stages.C, ...saved.stages?.C, iconImageUrl: webpBuiltInImage(saved.stages?.C?.iconImageUrl) || defaults.stages.C.iconImageUrl },
     },
     modules: Object.fromEntries(Object.entries(defaults.modules).map(([id, module]) => {
       const customized = saved.modules?.[id as keyof SiteContent["modules"]];
-      const merged = { ...module, ...customized };
+      const merged = { ...module, ...customized, imageUrl: webpBuiltInImage(customized?.imageUrl) ?? module.imageUrl };
       const legacyDefaultImageUrls: Partial<Record<keyof SiteContent["modules"], string[]>> = {
-        A1: ["/assets/v2/questions/a1-apple.png"],
-        A2: ["/assets/v2/questions/a2-train.png", "/assets/v2/questions/a2-train-v2.png"],
-        A4: ["/assets/v2/questions/a4-new-friend.png", "/assets/v2/questions/a4-new-friend-v2.png"],
-        A5: ["/assets/v2/questions/a5-tiger.png"],
+        A1: ["/assets/v2/questions/a1-apple.webp"],
+        A2: ["/assets/v2/questions/a2-train.webp", "/assets/v2/questions/a2-train-v2.webp"],
+        A4: ["/assets/v2/questions/a4-new-friend.webp", "/assets/v2/questions/a4-new-friend-v2.webp"],
+        A5: ["/assets/v2/questions/a5-tiger.webp"],
       };
       const legacyDefaultImageUrl = legacyDefaultImageUrls[id as keyof SiteContent["modules"]];
-      if (!customized?.imageUrl || legacyDefaultImageUrl?.includes(customized.imageUrl)) merged.imageUrl = module.imageUrl;
+      if (!customized?.imageUrl || legacyDefaultImageUrl?.includes(merged.imageUrl)) merged.imageUrl = module.imageUrl;
       if (id === "A3" && customized?.prompt === "先把三张图片排好顺序，再用“先、然后、最后”把故事讲出来。") merged.prompt = module.prompt;
       if (id === "A3" && customized?.teacherNote === "拖动图片或使用箭头调整顺序，排好后开始讲述。") merged.teacherNote = "";
       if (id === "A4" && customized?.teacherNote === "孩子理解场景后直接回答，不提供标准答案。") merged.teacherNote = "";
@@ -49,12 +55,13 @@ function normalizeContent(saved: SiteContent): SiteContent {
       if (module.sequenceItems) merged.sequenceItems = module.sequenceItems.map((item, index) => {
         const customizedItem = customized?.sequenceItems?.[index];
         const legacyDefaultSequenceImageUrls = [
-          "/assets/v2/questions/a3-seed.png",
-          "/assets/v2/questions/a3-water.png",
-          "/assets/v2/questions/a3-flower.png",
+          "/assets/v2/questions/a3-seed.webp",
+          "/assets/v2/questions/a3-water.webp",
+          "/assets/v2/questions/a3-flower.webp",
         ];
-        const useDefaultImage = !customizedItem?.imageUrl || customizedItem.imageUrl === legacyDefaultSequenceImageUrls[index];
-        return { ...item, ...customizedItem, imageUrl: useDefaultImage ? item.imageUrl : customizedItem.imageUrl };
+        const imageUrl = webpBuiltInImage(customizedItem?.imageUrl);
+        const useDefaultImage = !imageUrl || imageUrl === legacyDefaultSequenceImageUrls[index];
+        return { ...item, ...customizedItem, imageUrl: useDefaultImage ? item.imageUrl : imageUrl };
       });
       return [id, merged];
     })) as SiteContent["modules"],

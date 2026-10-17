@@ -63,12 +63,14 @@ try {
   await screenshot('布局检查');
   await button('声母 p：苹果').click();
   assert.equal(await page.locator('.course-word').textContent(), '苹果');
+  assert(await page.locator('.pronunciation-card__art img').evaluate((image) => image.complete && image.naturalWidth > 0));
   await button('教师星级评价').click();
   await button('保存评价').click();
   assert.equal(await page.locator('.course-task-picker button.is-complete').count(), 1);
   assert.equal(await page.locator('.smart-evaluator__dimension.is-complete').count(), 0);
   await button('声母 b：包子').click();
   assert.equal(await page.locator('.course-word').textContent(), '包子');
+  assert(await page.locator('.pronunciation-card__art img').evaluate((image) => image.complete && image.naturalWidth > 0));
   await button('评测说明').click(); await skip();
   await screenshot('正音-旧版布局');
   console.log('PASS 两阶段、三项目、23 声母、弹层交互、逐题教师评分');
@@ -81,7 +83,7 @@ try {
   assert.equal(await page.locator('.course-task-picker button.is-complete').count(), 0);
   await button('下一项').click();
   await button('下一步 →').click();
-  assert.match(await page.locator('.guide-visual--listen img').getAttribute('src'), /star-mascot-guide-blowing-mic-natural\.png$/);
+  assert.match(await page.locator('.guide-visual--listen img').getAttribute('src'), /star-mascot-guide-blowing-mic-natural\.webp$/);
   await screenshot('气息说明-吹气');
   await skip();
   await page.evaluate(() => { globalThis.silenceAfter = 1200; });
@@ -94,7 +96,7 @@ try {
   console.log('PASS 小火车停声和到达终点自动结算');
   await button('下一项').click();
   await button('下一步 →').click();
-  assert.match(await page.locator('.guide-visual--tiger img').getAttribute('src'), /star-mascot-guide-tiger\.png$/);
+  assert.match(await page.locator('.guide-visual--tiger img').getAttribute('src'), /star-mascot-guide-tiger\.webp$/);
   await screenshot('表现力说明-小老虎动作');
   await skip();
   assert.equal(await page.locator('.course-task-picker button').count(), 3);

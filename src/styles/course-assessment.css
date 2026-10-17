@@ -66,3 +66,4 @@
   .assessment-guide__step p { font-size: 16px; }
   .assessment-guide footer .button { min-width: 0; padding: 12px 16px; font-size: 15px; }
 }
+.assessment-image-error { margin: 0; padding: 10px 16px; border-radius: 12px; color: #7a3600; background: #fff2d2; font-weight: 700; }
