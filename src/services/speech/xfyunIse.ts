@@ -1,4 +1,5 @@
 import { acquireMicrophone, releaseMicrophone } from "@/services/audio/microphone";
+import { scorePronunciation } from "@/services/scoring/pronunciation";
 
 export interface XfyunIseResult {
   totalScore: number;
@@ -14,6 +15,8 @@ export interface XfyunIseResult {
   integrityScore?: number;
   stars: number;
   transcript?: string;
+  contentStatus?: "matched" | "mismatch" | "uncertain";
+  repetitionCount?: number;
   sessionId?: string;
   rawXml: string;
 }
@@ -65,6 +68,37 @@ export function matchesReferenceText(transcript: string, referenceText: string):
   const normalizedTranscript = normalizeSpeechText(transcript);
   const normalizedReference = normalizeSpeechText(referenceText);
   return normalizedTranscript.length > 0 && normalizedTranscript === normalizedReference;
+}
+
+export function countReferenceRepetitions(transcript: string, referenceText: string): number {
+  const heard = normalizeSpeechText(transcript);
+  const target = normalizeSpeechText(referenceText);
+  if (!target || !heard || heard.length % target.length !== 0) return 0;
+  const count = heard.length / target.length;
+  return target.repeat(count) === heard ? count : 0;
+}
+
+export function classifySpeechContent(result: XfyunIseResult, transcript: string, referenceText: string): NonNullable<XfyunIseResult["contentStatus"]> {
+  const recognized = normalizeSpeechText(transcript);
+  const target = normalizeSpeechText(referenceText);
+  const repetitionCount = countReferenceRepetitions(transcript, referenceText);
+  const pureRepetition = repetitionCount > 1;
+  const alignmentIssue = result.issues?.some((issue) => ["漏读", "增读", "回读", "替换"].includes(issue.kind)
+    && !(pureRepetition && ["增读", "回读"].includes(issue.kind)))
+    || result.reviewReasons?.some((reason) => reason.includes("引擎检测到内容不匹配"));
+  const audioIssue = result.reviewReasons?.some((reason) => /拒评|异常|音量|噪声|截幅|音频输入|缺少准确度/.test(reason));
+  const pronunciationIssue = result.issues?.some((issue) => ["声韵错误", "声调错误", "声韵及声调错误"].includes(issue.kind));
+  const matched = repetitionCount > 0;
+  // A child may self-correct; without word-level audio segmentation we cannot
+  // safely score only the final attempt as if the whole recording were correct.
+  if (!matched && target && recognized.includes(target)) return "uncertain";
+  if (audioIssue || !recognized) return "uncertain";
+  // Dictation can hear a different word while ISE marks the actual sound error
+  // without emitting a word-alignment flag (for example 包纸 / 包子).
+  if (!matched && (alignmentIssue || pronunciationIssue)) return "mismatch";
+  if (matched && alignmentIssue) return "uncertain";
+  if (!matched) return "uncertain";
+  return "matched";
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -160,7 +194,8 @@ export function parseXfyunIseResult(rawXml: string, sessionId?: string, category
       issues.push({ text, kind, position });
     }
   }
-  if (issues.length) reviewReasons.push("检测到错读或发音问题，请结合逐字提示复核；暂不生成自动星级");
+  if (issues.some((issue) => ["漏读", "增读", "回读", "替换"].includes(issue.kind))) reviewReasons.push("检测到错漏读标记，请结合录音复核");
+  if (issues.some((issue) => issue.kind.includes("错误"))) reviewReasons.push("检测到个别字音问题，可参考分项星级练习");
   const accuracyScore = score("accuracy_score");
   const pronunciationScore = score("phone_score");
   const toneScore = score("tone_score");
@@ -174,7 +209,7 @@ export function parseXfyunIseResult(rawXml: string, sessionId?: string, category
     fluencyScore: score("fluency_score"),
     integrityScore: score("integrity_score"),
     issues, reviewReasons: [...new Set(reviewReasons)],
-    stars: reviewReasons.length || basis === undefined ? 0 : Math.ceil(basis / 20),
+    stars: basis === undefined || reviewReasons.some((reason) => !reason.startsWith("检测到个别字音问题")) ? 0 : Math.ceil(basis / 20),
     sessionId,
     rawXml,
   };
@@ -222,6 +257,7 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
   let sendTimer = 0;
   let firstIseFrame = true;
   let firstIatFrame = true;
+  let iatFinished = false;
   let pendingBytes: number[] = [];
   const audioFrames: Uint8Array[] = [];
   let resolveResult!: (result: XfyunIseResult) => void;
@@ -257,19 +293,26 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
     rejectTranscript(error);
   };
 
+  const failIat = (message: string) => {
+    if (iatFinished) return;
+    iatFinished = true;
+    rejectTranscript(new Error(message));
+    iatSocket?.close(1000);
+  };
+
   const sendAudio = (bytes: Uint8Array) => {
-    if (!iseSocket || !iatSocket || !auth || iseSocket.readyState !== WebSocket.OPEN || iatSocket.readyState !== WebSocket.OPEN) {
-      throw new Error("语音连接中断，请重新评测。");
-    }
+    if (!iseSocket || !auth || iseSocket.readyState !== WebSocket.OPEN) throw new Error("智能评分连接中断，请重新评测。");
     const audio = bytesToBase64(bytes);
     iseSocket.send(JSON.stringify({
       business: { cmd: "auw", aus: firstIseFrame ? 1 : 2, aue: "raw" },
       data: { status: 1, data: audio, data_type: 1, encoding: "raw" },
     }));
     firstIseFrame = false;
+    if (iatFinished) return;
+    if (!iatSocket || iatSocket.readyState !== WebSocket.OPEN) { failIat("语音内容校验连接中断"); return; }
     iatSocket.send(JSON.stringify(firstIatFrame ? {
       common: { app_id: auth.appId },
-      business: { language: "zh_cn", domain: "iat", accent: "mandarin", ptt: 0, eos: 1200 },
+      business: { language: "zh_cn", domain: "iat", accent: "mandarin", ptt: 0, eos: 2300 },
       data: { status: 0, format: "audio/L16;rate=16000", encoding: "raw", audio },
     } : {
       data: { status: 1, format: "audio/L16;rate=16000", encoding: "raw", audio },
@@ -283,11 +326,12 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
       const frame = audioFrames.shift();
       if (frame) { sendAudio(frame); return; }
       if (!stopped) return;
-      if (!iseSocket || !iatSocket || iseSocket.readyState !== WebSocket.OPEN || iatSocket.readyState !== WebSocket.OPEN) throw new Error("语音连接中断，请重新评测。");
+      if (!iseSocket || iseSocket.readyState !== WebSocket.OPEN) throw new Error("智能评分连接中断，请重新评测。");
       finishedSending = true;
       window.clearInterval(sendTimer);
       iseSocket.send(JSON.stringify({ business: { cmd: "auw", aus: 4, aue: "raw" }, data: { status: 2, data: "", data_type: 1, encoding: "raw" } }));
-      iatSocket.send(JSON.stringify({ data: { status: 2, format: "audio/L16;rate=16000", encoding: "raw", audio: "" } }));
+      if (!iatFinished && iatSocket?.readyState === WebSocket.OPEN) iatSocket.send(JSON.stringify({ data: { status: 2, format: "audio/L16;rate=16000", encoding: "raw", audio: "" } }));
+      else if (!iatFinished) failIat("语音内容校验连接中断");
       resolveSending();
     } catch (reason) {
       fail(reason instanceof Error ? reason : new Error("语音传输失败，请重新评测。"));
@@ -319,8 +363,7 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
         data?: { status?: number; result?: { sn?: number; ws?: Array<{ cw?: Array<{ w?: string }> }> } };
       };
       if (response.code && response.code !== 0) {
-        rejectTranscript(new Error(`语音内容校验暂时无法完成：${response.message || response.code}`));
-        iatSocket?.close(1000);
+        failIat(`语音内容校验暂时无法完成：${response.message || response.code}`);
         return;
       }
       const result = response.data?.result;
@@ -329,16 +372,17 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
         transcriptParts.set(result.sn ?? transcriptParts.size, text);
       }
       if (response.data?.status === 2) {
+        iatFinished = true;
         resolveTranscript([...transcriptParts.entries()].sort(([left], [right]) => left - right).map(([, text]) => text).join(""));
         iatSocket?.close(1000);
       }
     } catch {
-      rejectTranscript(new Error("语音内容校验返回的数据无法解析。"));
+      failIat("语音内容校验返回的数据无法解析。");
     }
   };
 
-  const waitForSocket = (socket: WebSocket, serviceName: string, onOpen?: () => void) => new Promise<void>((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error(`连接${serviceName}超时。`)), 10000);
+  const waitForSocket = (socket: WebSocket, serviceName: string, onOpen?: () => void, timeoutMs = 10000) => new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error(`连接${serviceName}超时。`)), timeoutMs);
     socket.addEventListener("open", () => {
       window.clearTimeout(timeout);
       onOpen?.();
@@ -365,8 +409,9 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
     iseSocket.onmessage = onIseMessage;
     iatSocket.onmessage = onIatMessage;
     iseSocket.onerror = () => fail(new Error("无法连接智能评测服务，请稍后重试。"));
-    iatSocket.onerror = () => fail(new Error("无法连接语音内容校验服务，请稍后重试。"));
-    await Promise.all([
+    iatSocket.onerror = () => failIat("无法连接语音内容校验服务");
+    iatSocket.onclose = () => { if (!iatFinished) failIat("语音内容校验连接已关闭"); };
+    const [iseConnection, iatConnection] = await Promise.allSettled([
       waitForSocket(iseSocket, "智能评测服务", () => {
         iseSocket?.send(JSON.stringify({
           common: { app_id: auth?.appId },
@@ -374,8 +419,10 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
           data: { status: 0, data: "" },
         }));
       }),
-      waitForSocket(iatSocket, "语音内容校验服务"),
+      waitForSocket(iatSocket, "语音内容校验服务", undefined, 5000),
     ]);
+    if (iseConnection.status === "rejected") throw iseConnection.reason;
+    if (iatConnection.status === "rejected") failIat("语音内容校验未连接，结果需要老师确认");
     if (cancelled) return;
     connected = true;
     pumpAudio();
@@ -401,13 +448,27 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
       await ready;
       pumpAudio();
       await sendingPromise;
-      const timeout = new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("智能评星生成超时，请重新评测。")), 15000));
-      const [result, transcript] = await Promise.race([Promise.all([resultPromise, transcriptPromise]), timeout]);
-      if (!matchesReferenceText(transcript, referenceText)) {
-        const recognized = normalizeSpeechText(transcript);
-        return { ...result, transcript, stars: 0, reviewReasons: [...(result.reviewReasons ?? []), recognized ? `听写结果“${recognized}”与题目不同，请教师复核（听写也可能识别错误）。` : "听写没有识别到文字，请教师复核。"] };
-      }
-      return { ...result, transcript };
+      let resultTimeout = 0;
+      const result = await Promise.race([
+        resultPromise,
+        new Promise<never>((_, reject) => { resultTimeout = window.setTimeout(() => reject(new Error("智能评星生成超时，请重新评测。")), 15000); }),
+      ]).finally(() => window.clearTimeout(resultTimeout));
+      // Dictation is supporting evidence, not the pronunciation score itself.
+      // A slow or failed IAT response must not hold the result indefinitely.
+      let transcriptTimeout = 0;
+      const transcript = await Promise.race([
+        transcriptPromise.catch(() => ""),
+        new Promise<string>((resolve) => { transcriptTimeout = window.setTimeout(() => resolve(""), 2000); }),
+      ]).finally(() => window.clearTimeout(transcriptTimeout));
+      const recognized = normalizeSpeechText(transcript);
+      const contentStatus = classifySpeechContent(result, transcript, referenceText);
+      const repetitionCount = countReferenceRepetitions(transcript, referenceText);
+      const onlyRepeatMarkers = repetitionCount > 1 && result.issues?.every((issue) => ["回读", "增读", "声韵错误", "声调错误", "声韵及声调错误"].includes(issue.kind));
+      const reviewReasons = (result.reviewReasons ?? []).filter((reason) => !(contentStatus === "matched" && onlyRepeatMarkers && reason.startsWith("检测到错漏读标记")));
+      if (contentStatus === "mismatch") reviewReasons.push(`听写结果“${recognized}”与题目不同，评测也检测到发音或错漏读问题，请老师确认。`);
+      else if (contentStatus === "uncertain") reviewReasons.push(recognized ? `听写结果“${recognized}”与评测证据不一致，请重读或请老师确认。` : "听写未返回可靠文字，请重读或请老师确认。");
+      const evaluated = { ...result, transcript, repetitionCount, contentStatus, reviewReasons };
+      return { ...evaluated, stars: scorePronunciation(evaluated).stars };
     },
     cancel: () => {
       if (cancelled) return;

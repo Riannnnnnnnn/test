@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { VoiceConsole, type VoiceDimension } from "@/assessment/common/VoiceConsole/VoiceConsole";
 import { warmMicrophone } from "@/services/audio/microphone";
 import { SmartEvaluationUnavailableError, SpeechContentMismatchError, matchesReferenceText, prepareSpeechAuth, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
@@ -34,7 +34,9 @@ const dimensions = [
   { key: "toneScore", label: "声调准确" },
 ];
 
-export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, initialScore, initialPreview = false, dimensionRatings, sentence = false, strictRating = false, onReset, onEvaluated }: SmartSpeechEvaluatorProps) {
+export interface SmartSpeechEvaluatorHandle { retry: () => void; }
+
+export const SmartSpeechEvaluator = forwardRef<SmartSpeechEvaluatorHandle, SmartSpeechEvaluatorProps>(function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, initialScore, initialPreview = false, dimensionRatings, sentence = false, strictRating = false, onReset, onEvaluated }, ref) {
   const mounted = useRef(true);
   const session = useRef<XfyunIseSession | undefined>(undefined);
   const listening = useRef(false);
@@ -42,6 +44,7 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
   const silenceSince = useRef(0);
   const autoFinishing = useRef(false);
   const maximumTimer = useRef(0);
+  const noSpeechTimer = useRef(0);
   const [state, setState] = useState<EvaluationState>(initialScore !== undefined || evidence ? "done" : "idle");
   const [volume, setVolume] = useState(0);
   const [seconds, setSeconds] = useState(0);
@@ -55,7 +58,7 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
     if (!listening.current || autoFinishing.current) return;
     const now = performance.now();
     if (value > .08) {
-      if (!heardSince.current) heardSince.current = now;
+      if (!heardSince.current) { heardSince.current = now; window.clearTimeout(noSpeechTimer.current); }
       silenceSince.current = 0;
       return;
     }
@@ -63,13 +66,13 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
     // interpreting only the first sound as the whole answer.
     if (!heardSince.current || now - heardSince.current < (sentence ? 350 : 550)) return;
     if (!silenceSince.current) silenceSince.current = now;
-    if (now - silenceSince.current >= (sentence ? 1500 : 1050)) {
+    if (now - silenceSince.current >= (sentence ? 1500 : 1100)) {
       autoFinishing.current = true;
       void finish();
     }
   };
 
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; listening.current = false; window.clearTimeout(maximumTimer.current); session.current?.cancel(); }; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; listening.current = false; window.clearTimeout(maximumTimer.current); window.clearTimeout(noSpeechTimer.current); session.current?.cancel(); }; }, []);
   useEffect(() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }, [referenceText]);
   useEffect(() => {
     if (evidence || initialScore !== undefined || initialPreview || state !== "done") return;
@@ -85,6 +88,7 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
 
   async function start() {
     window.clearTimeout(maximumTimer.current);
+    window.clearTimeout(noSpeechTimer.current);
     listening.current = false;
     heardSince.current = 0;
     silenceSince.current = 0;
@@ -111,14 +115,25 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
       if (!mounted.current) { session.current.cancel(); return; }
       listening.current = true;
       setState("listening");
-      maximumTimer.current = window.setTimeout(() => { if (listening.current && !autoFinishing.current) { autoFinishing.current = true; void finish(); } }, sentence ? 30000 : 10000);
+      maximumTimer.current = window.setTimeout(() => { if (listening.current && !autoFinishing.current) { autoFinishing.current = true; void finish(); } }, sentence ? 30000 : 6500);
       const activeSession = session.current;
+      noSpeechTimer.current = window.setTimeout(() => {
+        if (!mounted.current || !listening.current || heardSince.current || session.current !== activeSession) return;
+        listening.current = false;
+        window.clearTimeout(maximumTimer.current);
+        activeSession.cancel();
+        session.current = undefined;
+        setError("没有检测到清楚的声音，请靠近麦克风再试一次。");
+        setErrorKind("general");
+        setState("error");
+      }, sentence ? 10000 : 4500);
       void activeSession.ready?.then(() => {
         if (mounted.current && session.current === activeSession) setNetworkReady(true);
       }, (reason: unknown) => {
         if (!mounted.current || session.current !== activeSession) return;
         listening.current = false;
         window.clearTimeout(maximumTimer.current);
+        window.clearTimeout(noSpeechTimer.current);
         activeSession.cancel();
         session.current = undefined;
         setError(reason instanceof SmartEvaluationUnavailableError ? "智能语音服务未就绪，请使用教师评分。" : "语音服务连接失败，请检查网络或联系管理员后重试。");
@@ -149,16 +164,20 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
     }
   }
 
+  useImperativeHandle(ref, () => ({ retry: () => { void start(); } }));
+
   async function finish() {
     if (!session.current) return;
     listening.current = false;
     window.clearTimeout(maximumTimer.current);
+    window.clearTimeout(noSpeechTimer.current);
     setState("processing");
     try {
       const result = await session.current.stop();
       session.current = undefined;
       if (!mounted.current) return;
       await onEvaluated(result);
+      if (!mounted.current) return;
       setLatestEvidence(result);
       setState("done");
     } catch (reason) {
@@ -196,9 +215,9 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
     const score = finalEvidence?.accuracyScore ?? dimensionRatings?.accuracyScore;
     dimensionItems.push({ key: "accuracyScore", label: "朗读准确度", done: score !== undefined && !(finalEvidence && hasBlockingSpeechReview(finalEvidence)), stars: finalEvidence ? speechDimensionStars(finalEvidence, "accuracyScore") : strictRating ? strictPronunciationStars(score) : getStars(score) });
   } else {
-    const matched = Boolean(isDone && !isPreview && finalEvidence?.transcript && matchesReferenceText(finalEvidence.transcript, referenceText) && !finalEvidence.reviewReasons?.length);
+    const matched = Boolean(isDone && !isPreview && finalEvidence && (finalEvidence.contentStatus === "matched" || (!finalEvidence.contentStatus && finalEvidence.transcript && matchesReferenceText(finalEvidence.transcript, referenceText) && !finalEvidence.reviewReasons?.length)));
     const review = Boolean(isDone && !isPreview && finalEvidence && !matched);
-    dimensionItems.push({ key: "wordMatch", label: "词语匹配", done: matched, stars: 0, statusText: matched ? "已匹配" : review ? "需复核" : "待检测", statusTone: matched ? "success" : review ? "review" : "pending" });
+    dimensionItems.push({ key: "wordMatch", label: "词语匹配", done: matched, stars: 0, statusText: matched ? "已匹配" : review ? finalEvidence?.contentStatus === "mismatch" ? "可能读错" : "没听清" : "待检测", statusTone: matched ? "success" : review ? "review" : "pending" });
   }
 
   return <VoiceConsole state={needsReview ? "error" : state} level={volume} timer={formatTime(seconds)} headline={headline} hint={hint} micLabel={micLabel} micAria={micAria} onStart={start} onPrepare={() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }} dimensions={dimensionItems} dimensionsAria={sentence ? "三个维度的智能评星" : "声韵、声调和词语匹配结果"}>
@@ -208,4 +227,4 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
       <small>{error}</small>
     </div>}
   </VoiceConsole>;
-}
+});

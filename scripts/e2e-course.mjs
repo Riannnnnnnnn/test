@@ -20,6 +20,12 @@ try {
   const button = (name) => page.getByRole('button', { name, exact: true });
   const skip = () => button('跳过说明 »').click();
   const screenshot = (name) => page.screenshot({ path: `${output}/${name}.png`, animations: 'disabled' });
+  await page.goto(baseUrl + '/');
+  assert.equal(await button('内容管理').count(), 0);
+  await button('全屏').click();
+  assert(await page.evaluate(() => Boolean(document.fullscreenElement)));
+  await button('退出全屏').click();
+  assert.equal(await page.evaluate(() => Boolean(document.fullscreenElement)), false);
   await page.goto(baseUrl + '/profile');
   const pronunciationChecks = await page.evaluate(async () => {
     const { scorePronunciation, strictPronunciationStars } = await import('/src/services/scoring/pronunciation.ts');
@@ -80,10 +86,15 @@ try {
   await button('下一步 →').click();
   await page.locator('.guide').getByRole('button', { name: '上一步', exact: true }).click();
   await skip();
+  await button('全屏').click();
+  assert(await page.evaluate(() => Boolean(document.fullscreenElement)));
+  await button('退出全屏').click();
+  assert.equal(await page.evaluate(() => Boolean(document.fullscreenElement)), false);
   assert.equal(await page.locator('.course-task-picker button').count(), 23);
+  assert.deepEqual(await page.locator('.course-task-picker__summary span').allTextContents().then((values) => values.map((value) => value.trim().split(/\s+/)[0])), ['读对', '没听清', '错误']);
   assert.equal(await page.locator('.pronunciation-card__question h2').count(), 0);
   await screenshot('布局检查');
-  await button('声母 p：苹果').click();
+  await page.getByRole('button', { name: /^声母 p：苹果/ }).click();
   assert.equal(await page.locator('.course-word').textContent(), '苹果');
   assert.equal(await page.locator('.vc-dim').last().locator('.vc-dim__label').textContent(), '词语匹配');
   assert.equal(await page.locator('.vc-dim').last().locator('.vc-dim__result').textContent(), '·待检测');
@@ -105,7 +116,7 @@ try {
   await page.locator('.vc__review-mark').waitFor();
   assert.equal(await page.locator('.vc__review-mark').textContent(), '×');
   assert.equal(await page.locator('.vc__chip').textContent(), '需重试');
-  assert.equal(await page.locator('.vc-dim').last().locator('.vc-dim__result').textContent(), '!需复核');
+  assert.equal(await page.locator('.vc-dim').last().locator('.vc-dim__result').textContent(), '!没听清');
   await screenshot('正音-读错与词语匹配');
   await page.goto(`${baseUrl}/report/${page.url().split('/')[4]}`);
   await page.getByRole('heading', { name: '正音观察' }).waitFor();
@@ -131,20 +142,30 @@ try {
   await button('重测').click();
   assert.equal(await page.locator('.vc__review-mark').count(), 0);
   await button('教师星级评价').click();
+  assert.match(await page.locator('[role="dialog"]').innerText(), /老师星级评价 · 发音清晰度/);
   await button('保存评价').click();
-  assert.equal(await page.locator('.course-task-picker button.is-complete').count(), 1);
+  assert.equal(await page.locator('.course-task-picker button.is-complete').count(), 0);
+  assert.equal(await page.locator('.course-task-picker__summary b').allTextContents().then((values) => values.join(',')), '0,0,0');
+  assert(await button('已完成教师评价').isVisible());
+  assert(await page.evaluate(async () => {
+    const db = await import('/src/services/storage/database.ts');
+    const session = await db.getSession(location.pathname.split('/')[2]);
+    const pronunciation = session.results.find((result) => result.moduleId === 'A1');
+    return Object.keys(pronunciation.teacherScores ?? {}).length > 0 && Object.values(pronunciation.items ?? {}).every((item) => !item.teacherScores);
+  }));
   assert.equal(await page.locator('.vc-dim.is-complete').count(), 0);
-  await button('声母 b：包子').click();
+  await page.getByRole('button', { name: /^声母 b：包子/ }).click();
   assert.equal(await page.locator('.course-word').textContent(), '包子');
   assert(await page.locator('.pron__art img').evaluate((image) => image.complete && image.naturalWidth > 0));
   await button('评测说明').click(); await skip();
   await screenshot('正音-旧版布局');
-  console.log('PASS 两阶段、三项目、23 声母、弹层交互、逐题教师评分');
+  console.log('PASS 两阶段、三项目、23 声母、弹层交互、项目整体教师评分');
   const sessionId = page.url().split('/')[4];
   await page.reload(); await page.locator('.course-word').waitFor();
   assert.equal(await page.locator('.guide').count(), 0);
-  assert.equal(await page.locator('.course-task-picker button.is-complete').count(), 1);
-  await button('声母 p：苹果').click();
+  assert.equal(await page.locator('.course-task-picker button.is-complete').count(), 0);
+  assert(await button('已完成教师评价').isVisible());
+  await page.getByRole('button', { name: /^声母 p：苹果/ }).click();
   await button('重测').click();
   assert.equal(await page.locator('.course-task-picker button.is-complete').count(), 0);
   await button('下一项').click();
@@ -176,6 +197,38 @@ try {
   await page.goto(url); await page.locator('.ability-observations').waitFor();
   assert.equal(await page.locator('.ability-observations > div').count(), 3);
   console.log('PASS 三个动物、三项报告、扫码报告');
+  await page.goto(`${baseUrl}/assessment/${sessionId}/A1`);
+  await page.evaluate(async () => {
+    const db = await import('/src/services/storage/database.ts');
+    const id = location.pathname.split('/')[2];
+    const saved = await db.getSession(id);
+    await db.saveSession({ ...saved, results: saved.results.map((entry) => entry.moduleId !== 'A1' ? entry : {
+      ...entry, items: { ...entry.items, 'A1-b': { moduleId: 'A1', questionId: 'A1-b', status: 'running',
+        rawResult: { provider: 'smart-speech', scoringVersion: 'ise-evidence-v2', referenceText: '包子', evidence: {
+          totalScore: 95, phoneScore: 95, stars: 0, rawXml: '', contentStatus: 'mismatch', transcript: '帽子',
+          issues: [{ text: '包', kind: '替换' }], reviewReasons: ['听写与评测都提示可能读错']
+        } }
+      } }
+    }) });
+  });
+  await page.reload();
+  const wrongInitial = page.locator('.course-task-picker button.is-wrong');
+  await wrongInitial.waitFor();
+  assert.match(await wrongInitial.innerText(), /×/);
+  assert.equal(await page.locator('.course-task-picker__summary b').allTextContents().then((values) => values.join(',')), '0,0,1');
+  assert.equal(await page.locator('.course-task-picker__summary').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length), 3);
+  assert.equal(await page.locator('.course-task-picker__buttons').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length), 4);
+  await wrongInitial.click();
+  await page.getByText('包子', { exact: true }).waitFor();
+  assert.equal(await page.locator('.course-task-picker button.is-wrong').count(), 1);
+  await page.getByRole('button', { name: /^声母 p：苹果/ }).click();
+  assert.equal(await page.locator('.course-task-picker button.is-wrong').count(), 1);
+  await wrongInitial.click();
+  await page.getByText('包子', { exact: true }).waitFor();
+  assert.equal(await page.locator('.course-task-picker button.is-wrong').count(), 1);
+  await page.getByRole('button', { name: '重新智能评测' }).click();
+  await page.waitForFunction(() => !document.querySelector('.course-task-picker button.is-wrong'));
+  console.log('PASS 声母四列布局、切题保留红叉，仅点击麦克风才清除旧结果');
   await page.goto(baseUrl + '/');
   await page.evaluate(async (id) => {
     const db = await import('/src/services/storage/database.ts');
@@ -245,4 +298,71 @@ try {
   assert(startup.bothServicesReceivedAudio, '连接后两条服务都应收到暂存音频');
   await latencyPage.close();
   console.log('PASS 点击后先收音，慢速语音连接建立后补发开头音频');
+  const popupPage = await context.newPage();
+  await popupPage.addInitScript(() => {
+    const nativeFetch = window.fetch;
+    window.fetch = (input, init) => String(input).includes('/api/xfyun/ise-auth')
+      ? Promise.resolve(new Response(JSON.stringify({ appId: 'test', url: 'wss://test/ise', iatUrl: 'wss://test/iat' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      : nativeFetch(input, init);
+    class ResultWebSocket extends EventTarget {
+      static OPEN = 1;
+      readyState = 0;
+      constructor(url) { super(); this.url = url; setTimeout(() => { this.readyState = 1; this.dispatchEvent(new Event('open')); }, 10); }
+      deliver(value) { this.onmessage?.(new MessageEvent('message', { data: JSON.stringify(value) })); }
+      send(raw) {
+        const packet = JSON.parse(raw);
+        if (packet.data?.status !== 2) return;
+        const kind = globalThis.fakeSpeechKind || 'correct';
+        if (this.url.endsWith('/iat')) {
+          const word = kind === 'correct' ? '包子' : kind === 'wrong' ? '包纸' : '流奶';
+          setTimeout(() => this.deliver({ code: 0, data: { status: 2, result: { sn: 0, ws: [{ cw: [{ w: word }] }] } } }), 20);
+        } else {
+          const issue = kind === 'wrong' ? '<syll content="子"><phone dp_message="0" perr_msg="1"/></syll>' : '';
+          const xml = `<read_word total_score="90" phone_score="90" tone_score="90">${issue}</read_word>`;
+          const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(xml)));
+          setTimeout(() => this.deliver({ code: 0, data: { status: 2, data: encoded } }), 30);
+        }
+      }
+      close() { this.readyState = 3; }
+    }
+    window.WebSocket = ResultWebSocket;
+  });
+  await page.evaluate(async (id) => {
+    const db = await import('/src/services/storage/database.ts');
+    const original = await db.getSession(id);
+    await db.saveSession({ ...original, id: 'popup-test', status: 'running', tutorialSeen: ['A1'], results: original.results.map((entry) => entry.moduleId === 'A1' ? { moduleId: 'A1', questionId: 'A1-b', activeItemId: 'A1-b', status: 'not_started', items: {} } : entry) });
+  }, sessionId);
+  await popupPage.goto(baseUrl + '/assessment/popup-test/A1');
+  await popupPage.getByText('包子', { exact: true }).waitFor();
+  await popupPage.evaluate(() => { globalThis.silenceAfter = 450; globalThis.fakeSpeechKind = 'correct'; });
+  await popupPage.getByRole('button', { name: '开始智能评测' }).click();
+  const resultDialog = popupPage.getByRole('dialog', { name: '读对啦！' });
+  await resultDialog.waitFor({ timeout: 12000 });
+  assert.match(await resultDialog.innerText(), /4 \/ 5 星/);
+  await popupPage.getByText('苹果', { exact: true }).waitFor({ timeout: 5000 });
+  await popupPage.getByRole('button', { name: /^声母 b：包子/ }).click();
+  await popupPage.evaluate(() => { globalThis.fakeSpeechKind = 'wrong'; });
+  await popupPage.getByRole('button', { name: '重新智能评测' }).click();
+  await popupPage.locator('.vc--listening').waitFor();
+  await popupPage.evaluate(() => { globalThis.testMicrophoneGain.gain.value = .24; setTimeout(() => { globalThis.testMicrophoneGain.gain.value = 0; }, 850); });
+  const wrongDialog = popupPage.getByRole('dialog', { name: '读音可能不对' });
+  await wrongDialog.waitFor({ timeout: 12000 });
+  assert(await popupPage.getByText('包子', { exact: true }).isVisible());
+  await wrongDialog.getByRole('button', { name: '跳过' }).click();
+  await popupPage.getByText('苹果', { exact: true }).waitFor();
+  await popupPage.getByRole('button', { name: /^声母 b：包子/ }).click();
+  await popupPage.evaluate(() => { globalThis.fakeSpeechKind = 'uncertain'; });
+  await popupPage.getByRole('button', { name: '重新智能评测' }).click();
+  await popupPage.locator('.vc--listening').waitFor();
+  await popupPage.evaluate(() => { globalThis.testMicrophoneGain.gain.value = .24; setTimeout(() => { globalThis.testMicrophoneGain.gain.value = 0; }, 850); });
+  const uncertainDialog = popupPage.getByRole('dialog', { name: '这次没听清' });
+  await uncertainDialog.waitFor({ timeout: 12000 });
+  assert.match(await uncertainDialog.innerText(), /语音听写参考：“流奶”/);
+  await popupPage.evaluate(() => { globalThis.fakeSpeechKind = 'correct'; });
+  await uncertainDialog.getByRole('button', { name: '再试一次' }).click();
+  await popupPage.locator('.vc--listening').waitFor();
+  await popupPage.evaluate(() => { globalThis.testMicrophoneGain.gain.value = .24; setTimeout(() => { globalThis.testMicrophoneGain.gain.value = 0; }, 850); });
+  await resultDialog.waitFor({ timeout: 12000 });
+  await popupPage.close();
+  console.log('PASS 读对显示星级后自动跳题，读错和没听清可跳过或直接重试');
 } finally { await browser.close(); }

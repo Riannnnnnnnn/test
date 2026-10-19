@@ -34,6 +34,8 @@ export function AssessmentPage() {
   const [attemptRevision, setAttemptRevision] = useState(0);
   const [manualGuide, setManualGuide] = useState(false);
   const [imageError, setImageError] = useState("");
+  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
+  const [fullscreenError, setFullscreenError] = useState("");
   const { content } = useSiteContent();
   const assessmentStage = session?.stage;
   const assessmentVersion = session?.courseVersion;
@@ -57,6 +59,22 @@ export function AssessmentPage() {
     const current = Math.max(0, ids.indexOf(moduleId));
     void preloadImages(ids.slice(current, current + 2).flatMap((id) => assessmentImageUrls(assessmentStage, id, content)));
   }, [assessmentVersion, assessmentStage, moduleId, content]);
+
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
+  async function toggleFullscreen() {
+    setFullscreenError("");
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      setFullscreenError("无法切换全屏，请检查浏览器是否允许全屏显示。");
+    }
+  }
 
   if (loading) return <div className="app-shell"><PageContainer><p className="loading-state">正在恢复评测进度…</p></PageContainer></div>;
   if (!session) return <div className="app-shell"><PageContainer><Card><h1>评测记录不存在</h1><Button onClick={() => navigate("/profile")}>开始新评测</Button></Card></PageContainer></div>;
@@ -110,10 +128,10 @@ export function AssessmentPage() {
         item.finalScores = mergeFinalScores(item.autoScores, item.teacherScores);
         const items = { ...result.items, [selectedTask.id]: item };
         const values = Object.values(items);
+        const autoScores = averageScoreRecords(values.map((value) => value.autoScores));
+        const teacherScores = result.teacherScores ?? averageScoreRecords(values.map((value) => value.teacherScores));
         return { ...result, items, status: "running" as const,
-          autoScores: averageScoreRecords(values.map((value) => value.autoScores)),
-          teacherScores: averageScoreRecords(values.map((value) => value.teacherScores)),
-          finalScores: averageScoreRecords(values.map((value) => value.finalScores)) };
+          autoScores, teacherScores, finalScores: mergeFinalScores(autoScores, teacherScores) };
       }
       const merged = { ...result, ...patch };
       if ("autoScores" in patch || "teacherScores" in patch) merged.finalScores = mergeFinalScores(merged.autoScores, merged.teacherScores);
@@ -130,7 +148,14 @@ export function AssessmentPage() {
   }
 
   async function saveTeacherScores(teacherScores: Record<string, number>) {
-    await updateResult({ teacherScores });
+    if (!selectedTask) { await updateResult({ teacherScores }); return; }
+    const latest = useAssessmentStore.getState().session;
+    if (!latest || latest.id !== activeSession.id) return;
+    const updated = { ...latest, results: latest.results.map((result) => result.moduleId === moduleId
+      ? { ...result, teacherScores, finalScores: mergeFinalScores(result.autoScores, teacherScores) }
+      : result) };
+    setSession(updated);
+    await saveSession(updated);
   }
 
   async function retry() { setAttemptRevision((value) => value + 1); await updateResult({ status: "not_started", startTime: undefined, endTime: undefined, duration: undefined, audioFile: undefined, transcript: undefined, rawResult: undefined, autoScores: undefined, teacherScores: undefined, finalScores: undefined }); }
@@ -155,16 +180,17 @@ export function AssessmentPage() {
   return (
     <div className={`app-shell assessment-page ${activeSession.courseVersion === 3 ? "assessment-page--guided" : ""}`}>
       <PageContainer>
-        <PageHeader actions={<><Button variant="ghost" size="small" onClick={() => { setScoringOpen(false); setManualGuide(true); }}>评测说明</Button><Button variant="ghost" size="small" onClick={() => navigate("/")}>保存并退出</Button></>} />
+        <PageHeader actions={<><Button variant="ghost" size="small" onClick={() => void toggleFullscreen()}>{isFullscreen ? "退出全屏" : "全屏"}</Button><Button variant="ghost" size="small" onClick={() => { setScoringOpen(false); setManualGuide(true); }}>评测说明</Button><Button variant="ghost" size="small" onClick={() => navigate("/")}>保存并退出</Button></>} />
+        {fullscreenError && <p className="assessment-image-error" role="alert">{fullscreenError}</p>}
         <div className="assessment-layout">
           <AssessmentHeader studentName={student?.name ?? "学生"} stage={activeSession.stage} moduleId={moduleId} current={index + 1} total={modules.length} />
           <section className="assessment-stage">{ActiveModule ? <ActiveModule studentGrade={student?.grade} key={`${moduleId}-${selectedTask?.id ?? "legacy"}-${attemptRevision}`} stage={activeSession.courseVersion === 3 ? activeSession.stage : undefined} items={activeResult.items} onSelectItem={selectItem} result={displayResult} onResultChange={updateResult} onRecorded={handleRecorded} /> : <Card><h2>模块准备中</h2><p>该模块已完成配置，交互将在后续阶段开放。</p></Card>}</section>
           {imageError && <p className="assessment-image-error" role="alert">{imageError}</p>}
-          <AssessmentFooter canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(displayResult.teacherScores && Object.keys(displayResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? displayResult.autoScores?.breathAndVoice : displayResult.autoScores?.pronunciationClarity} showIntelligentRating={false} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
+          <AssessmentFooter canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(activeResult.teacherScores && Object.keys(activeResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? displayResult.autoScores?.breathAndVoice : displayResult.autoScores?.pronunciationClarity} showIntelligentRating={false} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
         </div>
       </PageContainer>
       {guideOpen && <AssessmentGuide key={`${sessionId}-${moduleId}`} moduleId={moduleId} large={activeSession.stage !== "A"} onDismiss={() => void dismissGuide()} />}
-      <TeacherScoringDialog open={scoringOpen} moduleTitle={selectedTask?.title ?? (moduleId in content.modules ? content.modules[moduleId as keyof typeof content.modules].menuTitle : undefined) ?? moduleDefinitions[moduleId]?.title ?? "评测项目"} dimensions={question?.scoringDimensions ?? []} initialScores={displayResult.teacherScores} onClose={() => setScoringOpen(false)} onSave={saveTeacherScores} />
+      <TeacherScoringDialog open={scoringOpen} moduleTitle={(moduleId in content.modules ? content.modules[moduleId as keyof typeof content.modules].menuTitle : undefined) ?? moduleDefinitions[moduleId]?.title ?? "评测项目"} dimensions={question?.scoringDimensions ?? []} initialScores={activeResult.teacherScores} onClose={() => setScoringOpen(false)} onSave={saveTeacherScores} />
     </div>
   );
 }

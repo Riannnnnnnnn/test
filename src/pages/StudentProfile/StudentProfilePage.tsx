@@ -87,7 +87,7 @@ export function StudentProfilePage() {
             <form onSubmit={handleSubmit} noValidate>
               <div className="form-grid">
                 <Input label="姓名" name="name" required placeholder="请输入孩子姓名" autoComplete="off" value={form.name} onChange={(event) => update("name", event.target.value)} />
-                <Select label="性别" name="gender" required value={form.gender} onChange={(event) => update("gender", event.target.value as Gender)} options={[{ value: "male", label: "男" }, { value: "female", label: "女" }, { value: "other", label: "其他" }]} />
+                <Select label="性别" name="gender" required value={form.gender} onChange={(event) => update("gender", event.target.value as Gender)} options={[{ value: "male", label: "男" }, { value: "female", label: "女" }]} />
                 <Select label="年龄" name="age" required value={form.age} onChange={(event) => update("age", event.target.value)} options={ageOptions} />
                 <Select label="当前年级" name="grade" required value={form.grade} onChange={(event) => update("grade", event.target.value as GradeLevel)} options={gradeOptions} />
               </div>

@@ -7,6 +7,22 @@ export interface SpeechReviewFeedback {
 }
 
 export function getSpeechReviewFeedback(result: XfyunIseResult, referenceText: string): SpeechReviewFeedback | undefined {
+  if (result.contentStatus === "mismatch") return {
+    kind: "reading",
+    title: "读的词可能不对",
+    message: `请看看图片，再说一次“${referenceText}”。如果孩子已经读对，请老师听录音确认。`,
+  };
+  if (result.contentStatus === "uncertain") return {
+    kind: "uncertain",
+    title: "这次没听清",
+    message: "系统不能确认孩子读错了。请靠近麦克风再读一次，或请老师确认。",
+  };
+  if (result.contentStatus === "matched" && result.issues?.some((issue) => issue.kind.includes("声韵") || issue.kind.includes("声调"))) return {
+    kind: "pronunciation",
+    title: "有个别字音可以再练习",
+    message: "已保留本次的部分星级；请听一听，再练习标出的字音。",
+  };
+  if (result.contentStatus === "matched") return undefined;
   if (!result.reviewReasons?.length) return undefined;
   const readingIssue = result.issues?.some((issue) => ["漏读", "增读", "回读", "替换"].includes(issue.kind))
     || result.reviewReasons.some((reason) => reason.includes("引擎检测到内容不匹配"));

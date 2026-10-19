@@ -13,8 +13,9 @@ export function strictPronunciationStars(score?: number): number {
 const alignmentIssues = new Set(["漏读", "增读", "回读", "替换"]);
 
 export function hasBlockingSpeechReview(result: XfyunIseResult): boolean {
+  if (result.contentStatus) return result.contentStatus !== "matched";
   if (result.issues?.some((issue) => alignmentIssues.has(issue.kind))) return true;
-  return Boolean(result.reviewReasons?.some((reason) => !reason.startsWith("检测到错读或发音问题")));
+  return Boolean(result.reviewReasons?.some((reason) => !reason.startsWith("检测到错读或发音问题") && !reason.startsWith("检测到个别字音问题")));
 }
 
 export function speechDimensionStars(result: XfyunIseResult, key: "pronunciationScore" | "toneScore" | "accuracyScore"): number {
@@ -38,7 +39,11 @@ export function scorePronunciation(result: XfyunIseResult) {
   const basis = sentence ? result.accuracyScore
     : result.pronunciationScore !== undefined && result.toneScore !== undefined
       ? Math.min(result.pronunciationScore, result.toneScore) : undefined;
-  const pronunciationClarity = result.reviewReasons?.length ? undefined : basis;
+  const issueKinds = result.issues?.map((issue) => issue.kind) ?? [];
+  const pronunciationIssues = issueKinds.filter((kind) => kind.includes("声韵") || kind.includes("声调"));
+  // Preserve the engine evidence, but do not present a flagged sound as perfect.
+  const cappedBasis = basis === undefined ? undefined : Math.min(basis, pronunciationIssues.length >= 2 ? 87 : pronunciationIssues.length === 1 ? 97 : 100);
+  const pronunciationClarity = hasBlockingSpeechReview(result) ? undefined : cappedBasis;
   const scores: Record<string, number> = {};
   if (pronunciationClarity !== undefined) scores.pronunciationClarity = pronunciationClarity;
   return { scores, stars: strictPronunciationStars(pronunciationClarity), basis };

@@ -123,6 +123,11 @@
 }
 .course-task-picker .course-task-picker__buttons button.is-selected i { box-shadow: 0 0 0 2px #5b2fb3; }
 .course-task-picker .course-task-picker__buttons button:focus-visible { outline: 3px solid rgba(255, 212, 76, .8); outline-offset: 2px; }
+.course-task-picker .course-task-picker__buttons button.is-wrong:not(.is-selected) { border-color: #f36b78; background: #fff1f2; color: #9f1d32; }
+.course-task-picker .course-task-picker__buttons button.is-uncertain:not(.is-selected) { border-color: #e7b24e; background: #fff9ea; }
+.course-task-picker .course-task-picker__buttons button.is-wrong i { top: -5px; right: -5px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #e4445b; color: #fff; font-size: 18px; font-weight: 900; line-height: 1; box-shadow: 0 0 0 2px #fff; }
+.course-task-picker .course-task-picker__buttons button.is-uncertain i { top: -5px; right: -5px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #e5a020; color: #fff; font-size: 13px; font-weight: 900; line-height: 1; box-shadow: 0 0 0 2px #fff; }
+.course-task-picker .course-task-picker__buttons button.is-done i { top: -5px; right: -5px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #ffd64c; color: #592f0b; font-size: 13px; font-weight: 900; line-height: 1; }
 
 /* ---------- 卡片外壳 ---------- */
 .card.pro-card {
@@ -132,6 +137,38 @@
 
 /* ---------- 正音：题面舞台 ---------- */
 .card.pron { grid-template-rows: auto minmax(0, 1fr) auto; }
+.card.pron--initials { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+.pron--initials .pron__picker { grid-column: 1; grid-row: 1 / 3; padding: 14px; border: 1px solid var(--pro-line); border-radius: 18px; background: #faf8ff; }
+.pron--initials .pron__stage { grid-column: 2; grid-row: 1; }
+.pron--initials .pron__console { grid-column: 2; grid-row: 2; }
+.pron--initials .course-task-picker .course-task-picker__buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(49px, 1fr); gap: 8px; }
+.pron--initials .course-task-picker--initials .course-task-picker__buttons button { width: 100%; min-width: 0; max-width: none; min-height: 49px; padding: 4px; font-size: 19px; }
+.pron--initials .course-task-picker > p { flex-wrap: wrap; }
+.pron--initials .course-task-picker__meter { flex: 1 1 75px; }
+.pron--initials .course-task-picker__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--pro-line); }
+.pron--initials .course-task-picker__summary span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; min-height: 48px; padding: 4px 2px; border-radius: 10px; background: #e2f5e8; color: #176b3e; font-size: 11px; font-weight: 750; white-space: nowrap; }
+.pron--initials .course-task-picker__summary span.is-uncertain { background: #fff0d6; color: #9b5d08; }
+.pron--initials .course-task-picker__summary span.is-wrong { background: #ffe2e5; color: #a7243c; }
+.pron--initials .course-task-picker__summary b { font-size: 18px; line-height: 1; font-variant-numeric: tabular-nums; }
+.pron-result { display: grid; justify-items: center; gap: 13px; padding: 4px 0 8px; text-align: center; }
+.pron-result__badge { padding: 6px 15px; border-radius: 999px; background: #fff3cb; color: #8a4b00; font-size: 15px; font-weight: 900; letter-spacing: .06em; }
+.pron-result p { margin: 0; color: var(--color-purple-900); font-size: clamp(20px, 4vw, 26px); font-weight: 900; }
+.pron-result p b { color: #6b37c9; }
+.pron-result__star-card { min-width: min(100%, 310px); display: grid; justify-items: center; gap: 9px; padding: 17px 24px; border: 2px solid #ffda65; border-radius: 18px; background: linear-gradient(145deg, #3a1677, #59299b); box-shadow: inset 0 1px 0 rgba(255,240,184,.16), 0 10px 25px rgba(43,17,98,.22); }
+.pron-result__star-card > span:first-child { color: #ffe48b; font-size: 14px; font-weight: 900; }
+.pron-result__stars .rounded-star-rating { gap: 7px; font-size: clamp(31px, 7vw, 43px); color: #ffd44c; }
+.pron-result__stars .rounded-star:not(.is-filled) path { stroke: rgba(255,255,255,.4); }
+.pron-result__stars .rounded-star.is-filled { filter: drop-shadow(0 0 4px rgba(255,228,130,.92)) drop-shadow(0 0 11px rgba(255,176,0,.7)); animation: vc-star-pop .56s var(--pro-spring) both; }
+.pron-result__stars .rounded-star.is-filled:nth-child(2) { animation-delay: .12s; }
+.pron-result__stars .rounded-star.is-filled:nth-child(3) { animation-delay: .24s; }
+.pron-result__stars .rounded-star.is-filled:nth-child(4) { animation-delay: .36s; }
+.pron-result__stars .rounded-star.is-filled:nth-child(5) { animation-delay: .48s; }
+.pron-result__star-card strong { color: #ffe48b; font-size: 17px; line-height: 1.2; }
+.pron-result small { color: var(--color-muted); font-size: 14px; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .pron-result__stars .rounded-star.is-filled { animation: none; } }
+.pron-result__hint { margin: 0; color: var(--color-text); font-size: 17px; line-height: 1.65; }
+.pron-result__hint p { margin: 0 0 8px; }
+.pron-result__hint small { display: block; color: var(--color-muted); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .pron__picker { min-width: 0; }
 .pron__stage {
   position: relative; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: stretch; gap: clamp(16px, 2.6vw, 40px);
@@ -355,6 +392,8 @@
   .pro-tools { grid-column: 1 / -1; grid-row: 1; flex-wrap: wrap; }
   .card.pro-card { height: auto; }
   .card.pron { grid-template-rows: auto auto auto; }
+  .card.pron--initials { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
+  .pron--initials .pron__picker, .pron--initials .pron__stage, .pron--initials .pron__console { grid-column: 1; grid-row: auto; }
   .pron__stage { grid-template-columns: minmax(0, 1fr); padding: 14px; text-align: center; }
   .pron__art { height: 200px; }
     .vc { grid-template-columns: 84px minmax(0, 1fr); }

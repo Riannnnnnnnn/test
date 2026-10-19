@@ -5,7 +5,7 @@ export interface AssessmentModuleProps {
   stage?: StageId;
   studentGrade?: string;
   items?: Record<string, AssessmentResult>;
-  onSelectItem?: (id: string) => void;
+  onSelectItem?: (id: string) => void | Promise<void>;
   result: AssessmentResult;
   onResultChange: (patch: Partial<AssessmentResult>) => void | Promise<void>;
   onRecorded: (recording: AudioRecording) => void | Promise<void>;
