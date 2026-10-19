@@ -10,7 +10,7 @@ try {
   await context.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = async () => {
       const audio = new AudioContext(), oscillator = audio.createOscillator(), gain = audio.createGain(), dest = audio.createMediaStreamDestination();
-      gain.gain.value = .24; oscillator.connect(gain).connect(dest); oscillator.start();
+      gain.gain.value = .24; globalThis.testMicrophoneGain = gain; oscillator.connect(gain).connect(dest); oscillator.start();
       if (globalThis.silenceAfter !== undefined) setTimeout(() => { gain.gain.value = 0; }, globalThis.silenceAfter);
       return dest.stream;
     };
@@ -45,19 +45,30 @@ try {
   await page.getByRole('button', { name: /开始评测/ }).click();
   await page.locator('.module-list__item').first().waitFor();
   assert.equal(await page.locator('.module-list__item').count(), 3);
-  assert(await button('开始正式评测').isDisabled());
+  assert(await button('开始正式评测').isEnabled());
+  assert.equal(await page.locator('.microphone-check').count(), 0);
+  await button('开始正式评测').click();
+  assert(await page.locator('dialog.microphone-check-dialog').evaluate((el) => el.matches(':modal')));
+  assert(await button('进入评测').isDisabled());
+  await screenshot('麦克风测试弹窗');
   await button('测试麦克风').click();
   await page.locator('.microphone-check--success').waitFor();
-  assert(await button('开始正式评测').isEnabled());
+  assert(await button('进入评测').isEnabled());
   await button('重新测试麦克风').click();
-  assert(await button('开始正式评测').isDisabled());
+  assert(await button('进入评测').isDisabled());
   await button('停止测试').click();
-  assert(await button('开始正式评测').isDisabled());
+  assert(await button('进入评测').isDisabled());
   await page.locator('.microphone-check--idle').waitFor();
   await page.locator('.microphone-check > button').click();
   await page.locator('.microphone-check--success').waitFor();
-  assert(await button('开始正式评测').isEnabled());
+  assert(await button('进入评测').isEnabled());
+  await button('稍后再测').click();
+  assert.equal(await page.locator('dialog.microphone-check-dialog').count(), 0);
   await button('开始正式评测').click();
+  assert(await button('进入评测').isDisabled());
+  await button('测试麦克风').click();
+  await page.locator('.microphone-check--success').waitFor();
+  await button('进入评测').click();
   await page.locator('.guide').waitFor();
   assert(await page.locator('dialog.guide-backdrop').evaluate((el) => el.matches(':modal')));
   await screenshot('说明弹层');
@@ -95,7 +106,7 @@ try {
   await page.evaluate(() => { globalThis.silenceAfter = 1200; });
   await button('开始气息评测').click();
   await page.getByText('发声已停止，评测完成', { exact: true }).waitFor({ timeout: 12000 });
-  await page.evaluate(() => { globalThis.silenceAfter = undefined; });
+  await page.evaluate(() => { globalThis.silenceAfter = undefined; globalThis.testMicrophoneGain.gain.value = .24; });
   await button('开始气息评测').click();
   await page.getByText('已到达终点，评测完成', { exact: true }).waitFor({ timeout: 20000 });
   await screenshot('气息-自动结束');

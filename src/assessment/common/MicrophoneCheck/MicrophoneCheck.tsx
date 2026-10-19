@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui";
+import { acquireMicrophone, releaseMicrophone } from "@/services/audio/microphone";
 
 type Status = "idle" | "requesting" | "listening" | "success" | "error";
 
@@ -41,10 +42,14 @@ export function MicrophoneCheck({ onPassedChange }: MicrophoneCheckProps) {
     let audio: AudioContext | undefined;
     let frame = 0;
     let timer = 0;
-    const cleanup = () => {
+    const cleanup = (keepForAssessment = false) => {
       cancelAnimationFrame(frame);
       window.clearTimeout(timer);
-      stream?.getTracks().forEach((track) => track.stop());
+      if (stream) {
+        if (keepForAssessment) releaseMicrophone(stream);
+        else stream.getTracks().forEach((track) => track.stop());
+        stream = undefined;
+      }
       if (audio && audio.state !== "closed") void audio.close().catch(() => {});
     };
     release.current = cleanup;
@@ -53,7 +58,7 @@ export function MicrophoneCheck({ onPassedChange }: MicrophoneCheckProps) {
       audio = new AudioContext();
       await audio.resume();
       if (run !== generation.current) { cleanup(); return; }
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      stream = await acquireMicrophone();
       if (run !== generation.current) { cleanup(); return; }
       const analyser = audio.createAnalyser();
       analyser.fftSize = 1024;
@@ -64,7 +69,7 @@ export function MicrophoneCheck({ onPassedChange }: MicrophoneCheckProps) {
       setMessage("请对着麦克风发出声音，观察下方音量条是否变化。");
       const finish = (next: Status, text: string) => {
         if (run !== generation.current) return;
-        cleanup();
+        cleanup(next === "success");
         setLevel(0);
         setStatus(next);
         setMessage(text);

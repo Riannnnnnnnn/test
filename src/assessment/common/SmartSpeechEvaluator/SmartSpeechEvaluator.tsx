@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { VoiceConsole } from "@/assessment/common/VoiceConsole/VoiceConsole";
+import { warmMicrophone } from "@/services/audio/microphone";
 import { SmartEvaluationUnavailableError, SpeechContentMismatchError, prepareSpeechAuth, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
 import { strictPronunciationStars } from "@/services/scoring/pronunciation";
 
@@ -66,7 +67,7 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
   };
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; listening.current = false; window.clearTimeout(maximumTimer.current); session.current?.cancel(); }; }, []);
-  useEffect(() => { void prepareSpeechAuth().catch(() => undefined); }, [referenceText]);
+  useEffect(() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }, [referenceText]);
   useEffect(() => {
     if (evidence || initialScore !== undefined || initialPreview || state !== "done") return;
     setState("idle");
@@ -181,14 +182,7 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
     return { key, label, done: score !== undefined && !evidence?.reviewReasons?.length, stars: evidence?.reviewReasons?.length ? 0 : strictRating ? strictPronunciationStars(score) : getStars(score) };
   });
 
-  return <VoiceConsole state={state} level={volume} timer={formatTime(seconds)} headline={headline} hint={hint} micLabel={micLabel} micAria={micAria} onStart={start} onPrepare={() => { void prepareSpeechAuth().catch(() => undefined); }} dimensions={dimensionItems} dimensionsAria="三个维度的智能评星">
-    {evidence && <div className="speech-evidence" aria-label="朗读评测依据">
-      <p>{evidence.reviewReasons?.length ? "本次需要教师复核，未生成自动成绩" : "评分依据：" + (sentence ? "朗读准确度" : "声韵与声调的较低分（非内容正确率）")}</p>
-      <dl>{[["朗读准确度", evidence.accuracyScore], ["声韵", evidence.pronunciationScore], ["声调", evidence.toneScore], ["流畅度", evidence.fluencyScore], ["完整度", evidence.integrityScore], ["整体印象", evidence.emotionScore], ["引擎总分（仅供参考）", evidence.totalScore]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{typeof value === "number" ? value.toFixed(1) : "未返回"}</dd></div>)}</dl>
-      {evidence.reviewReasons?.map((reason) => <p role="status" key={reason}>{reason}</p>)}
-      {!!evidence.issues?.length && <ul>{evidence.issues.map((issue, index) => <li key={index}>{issue.text}：{issue.kind}</li>)}</ul>}
-      <small>各分项按百分制原值展示；流畅度和整体印象不参与准确度计分。星级按98/88/75/60/40分依次对应5/4/3/2/1星，低于40分为0星；这是产品展示规则，未经儿童样本校准。</small>
-    </div>}
+  return <VoiceConsole state={state} level={volume} timer={formatTime(seconds)} headline={headline} hint={hint} micLabel={micLabel} micAria={micAria} onStart={start} onPrepare={() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }} dimensions={dimensionItems} dimensionsAria="三个维度的智能评星">
     {error && <div className={`vc__error ${errorKind === "mismatch" ? "vc__error--mismatch" : ""}`} role="alert">
       <button type="button" className="vc__error-retry" onClick={start} aria-label="重新评测" title="重新评测"><img src="/assets/icons/refresh.svg" alt="" /><strong>{errorKind === "mismatch" ? "再试一次" : "重新评测"}</strong></button>
       <small>{error}</small>

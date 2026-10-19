@@ -1,3 +1,5 @@
+import { acquireMicrophone, releaseMicrophone } from "@/services/audio/microphone";
+
 export interface XfyunIseResult {
   totalScore: number;
   accuracyScore?: number;
@@ -197,7 +199,7 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
   const business = buildIseBusiness({ referenceText, category, studentGrade });
   const authRequest = getSpeechAuth();
   void authRequest.catch(() => undefined);
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const stream = await acquireMicrophone();
   const audioContext = new AudioContext();
   const source = audioContext.createMediaStreamSource(stream);
   const resample = create16kResampler(audioContext.sampleRate);
@@ -242,7 +244,7 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
     processor.disconnect();
     source.disconnect();
     silentGain.disconnect();
-    stream.getTracks().forEach((track) => track.stop());
+    releaseMicrophone(stream);
     void audioContext.close();
     onVolume?.(0);
   };
@@ -421,7 +423,7 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
 }
 
 export async function startPreviewSpeechSession({ onVolume }: Pick<StartOptions, "onVolume">): Promise<XfyunIseSession> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const stream = await acquireMicrophone();
   const audioContext = new AudioContext();
   const source = audioContext.createMediaStreamSource(stream);
   const analyser = audioContext.createAnalyser();
@@ -437,7 +439,7 @@ export async function startPreviewSpeechSession({ onVolume }: Pick<StartOptions,
   const cleanup = () => {
     window.clearInterval(timer);
     source.disconnect();
-    stream.getTracks().forEach((track) => track.stop());
+    releaseMicrophone(stream);
     void audioContext.close();
     onVolume?.(0);
   };

@@ -12,6 +12,17 @@
 .microphone-check__meter { height: 12px; margin: 10px 0; overflow: hidden; border-radius: 99px; background: #e6dcf5; }
 .microphone-check__meter span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8455d0, #ffd43b); transition: width 90ms linear; }
 @media (max-width: 620px) { .microphone-check { align-items: stretch; flex-direction: column; padding: 16px; } }
+.microphone-check-dialog { width: min(560px, calc(100% - 32px)); max-width: none; max-height: min(90dvh, 720px); margin: auto; padding: 0; border: 0; border-radius: 26px; overflow: auto; background: #fff; color: var(--color-text); box-shadow: 0 30px 90px rgba(17,6,42,.35); }
+.microphone-check-dialog::backdrop { background: rgba(20,8,48,.72); backdrop-filter: blur(5px); }
+.microphone-check-dialog__panel { padding: clamp(20px, 4vw, 32px); }
+.microphone-check-dialog__head, .microphone-check-dialog__footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.microphone-check-dialog__head span { color: var(--color-purple-700); font-size: 14px; font-weight: 800; }
+.microphone-check-dialog__head h2 { margin: 5px 0 0; color: var(--color-purple-900); font-size: clamp(24px, 4vw, 30px); }
+.microphone-check-dialog__close { width: 40px; height: 40px; flex: 0 0 auto; border: 0; border-radius: 50%; background: var(--color-purple-100); color: var(--color-purple-900); font-size: 28px; cursor: pointer; }
+.microphone-check-dialog .microphone-check { margin-top: 24px; }
+.microphone-check-dialog__footer { justify-content: space-between; margin-top: 24px; }
+.microphone-check-dialog__footer .button { min-width: 128px; }
+@media (max-width: 620px) { .microphone-check-dialog__footer { flex-direction: column-reverse; align-items: stretch; } .microphone-check-dialog__footer .button { width: 100%; } }
 .hero__eyebrow { color: var(--color-yellow-500); }
 .hero .display-title span { color: var(--color-yellow-500); }
 .hero .lead { max-width: 620px; margin: 24px 0 30px; font-size: 18px; }
@@ -180,8 +191,6 @@
   .stage-intro-page .ability-chips span { padding: 7px 12px; font-size: 13px; }
   .stage-intro-page .module-list { gap: 8px 10px; }
   .stage-intro-page .module-list__item { min-height: 60px; padding: 9px 14px; }
-  .stage-intro-page .microphone-check { margin-top: clamp(10px, 1.5vh, 16px); padding: 10px 16px; }
-  .stage-intro-page .microphone-check p { margin: 3px 0; line-height: 1.45; }
   .stage-intro-page .intro-card__footer { padding-top: clamp(10px, 1.5vh, 16px); margin-top: clamp(10px, 1.5vh, 16px); }
   .assessment-page { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
   .assessment-page .page-container { height: 100%; min-height: 0; padding: 16px 0; display: flex; flex-direction: column; }
@@ -848,8 +857,5 @@
   .pronunciation-card__syllable strong { font-size: 34px; }
 }
 
-.speech-evidence { padding: 12px; text-align: left; font-size: 14px; }
-.speech-evidence dl { display: flex; flex-wrap: wrap; gap: 12px; }
-.speech-evidence dd { margin: 0; font-weight: bold; }
 .reading-evidence { padding: 20px; background: #faf7ff; border-radius: 16px; margin: 20px 0; }
 .reading-evidence article { border-top: 1px solid #ded4f1; padding: 10px 0; }

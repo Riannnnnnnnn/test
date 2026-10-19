@@ -27,6 +27,12 @@ try {
     const packets = [];
     const originalFetch = window.fetch;
     const originalWebSocket = window.WebSocket;
+    const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    let microphoneRequests = 0;
+    navigator.mediaDevices.getUserMedia = (...args) => {
+      microphoneRequests += 1;
+      return originalGetUserMedia(...args);
+    };
     window.fetch = (input, init) => String(input).includes('/api/xfyun/ise-auth')
       ? Promise.resolve(new Response(JSON.stringify({ appId: 'test', url: 'wss://test/ise', iatUrl: 'wss://test/iat' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       : originalFetch(input, init);
@@ -55,16 +61,31 @@ try {
       const bothServicesReceivedAudio = ['ise', 'iat'].every((service) => packets.some((packet) =>
         packet.url.endsWith(service) && (packet.value.data?.audio || packet.value.business?.cmd === 'auw')));
       session.cancel();
-      return { captureDelay, capturedBeforeConnection, bothServicesReceivedAudio };
+      const { acquireMicrophone, releaseMicrophone, shutdownMicrophone, warmMicrophone } = await import('/src/services/audio/microphone.ts');
+      const reused = await acquireMicrophone();
+      const reusedAfterCancel = microphoneRequests === 1 && reused.getAudioTracks()[0]?.enabled === true;
+      releaseMicrophone(reused);
+      shutdownMicrophone();
+      const closedOnShutdown = reused.getAudioTracks()[0]?.readyState === 'ended';
+      const originalQuery = navigator.permissions.query.bind(navigator.permissions);
+      navigator.permissions.query = async () => ({ state: 'prompt' });
+      await warmMicrophone();
+      const noPermissionPromptDuringWarmup = microphoneRequests === 1;
+      navigator.permissions.query = originalQuery;
+      return { captureDelay, capturedBeforeConnection, bothServicesReceivedAudio, reusedAfterCancel, closedOnShutdown, noPermissionPromptDuringWarmup };
     } finally {
       window.fetch = originalFetch;
       window.WebSocket = originalWebSocket;
+      navigator.mediaDevices.getUserMedia = originalGetUserMedia;
     }
   });
   assert(outcome.captureDelay < 1200, `麦克风启动耗时 ${outcome.captureDelay.toFixed(0)}ms`);
   assert(outcome.capturedBeforeConnection, '连接期间应已开始本地收音');
   assert(outcome.bothServicesReceivedAudio, '连接后两条服务都应收到暂存音频');
-  console.log('PASS 点击后先收音，慢速语音连接建立后补发开头音频');
+  assert(outcome.reusedAfterCancel, '重测应复用短时保留的麦克风，不重新申请设备');
+  assert(outcome.closedOnShutdown, '离开页面时应关闭空闲麦克风');
+  assert(outcome.noPermissionPromptDuringWarmup, '未授权时预热不应请求麦克风权限');
+  console.log('PASS 点击后先收音、慢连接补发音频、重测复用麦克风');
 } finally {
   await browser.close();
 }

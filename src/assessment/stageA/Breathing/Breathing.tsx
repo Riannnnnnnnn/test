@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { VoiceConsole } from "@/assessment/common/VoiceConsole/VoiceConsole";
 import type { AssessmentModuleProps } from "@/assessment/types";
 import { useSiteContent } from "@/content/useSiteContent";
-import { BrowserAudioRecorder } from "@/services/audio";
+import { BrowserAudioRecorder, warmMicrophone } from "@/services/audio";
 import { Card } from "@/components/ui";
 import type { CSSProperties } from "react";
 
@@ -41,6 +41,7 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
   const [sustainedSeconds, setSustainedSeconds] = useState(Number(result.rawResult?.sustainedSeconds ?? 0));
   const [interruptions, setInterruptions] = useState(Number(result.rawResult?.interruptions ?? 0));
 
+  useEffect(() => { void warmMicrophone(); }, []);
   useEffect(() => { const currentRecorder = recorder.current; mounted.current = true; return () => { mounted.current = false; currentRecorder.cancel(); }; }, []);
   useEffect(() => { finishRef.current = finish; });
   useEffect(() => {
@@ -165,6 +166,6 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
         <span className={`breath__goal ${progress >= 1 ? "is-reached" : ""}`} aria-label={module.secondaryText}><span className="breath__flag">{module.secondaryText}</span><span className="breath__pole" aria-hidden="true" /></span>
       </div>
     </div>
-    <VoiceConsole className="breath__console" state={consoleState} level={volume} timer={`${sustainedSeconds.toFixed(1)}s`} headline={headline} hint={helperText} micLabel={micLabel} micAria={active ? "正在自动评测气息" : "开始气息评测"} onStart={start} dimensions={dimensionItems} dimensionsAria="三个维度的智能评星" />
+    <VoiceConsole className="breath__console" state={consoleState} level={volume} timer={`${sustainedSeconds.toFixed(1)}s`} headline={headline} hint={helperText} micLabel={micLabel} micAria={active ? "正在自动评测气息" : "开始气息评测"} onStart={start} onPrepare={() => { void warmMicrophone(); }} dimensions={dimensionItems} dimensionsAria="三个维度的智能评星" />
   </Card>;
 }
