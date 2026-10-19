@@ -1,7 +1,8 @@
 import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
-const output = 'E:/codex留存文件/评测整合-20261017';
+const baseUrl = process.env.E2E_BASE_URL || 'http://127.0.0.1:5173';
+const output = process.env.E2E_OUTPUT || 'tmp/e2e-course';
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
 try {
@@ -19,28 +20,21 @@ try {
   const button = (name) => page.getByRole('button', { name, exact: true });
   const skip = () => button('跳过说明 »').click();
   const screenshot = (name) => page.screenshot({ path: `${output}/${name}.png`, animations: 'disabled' });
-  await page.goto('http://127.0.0.1:5173/profile');
+  await page.goto(baseUrl + '/profile');
   const pronunciationChecks = await page.evaluate(async () => {
     const { scorePronunciation, strictPronunciationStars } = await import('/src/services/scoring/pronunciation.ts');
-    const makeResult = (tone, syllable, phoneFlag = 0) => ({
-      totalScore: 98, pronunciationScore: 98, toneScore: tone, stars: 5,
-      rawXml: `<read_word><syll content="苹" syll_score="${syllable}"><phone dp_message="${phoneFlag}" /></syll><syll content="果" syll_score="4.9" /></read_word>`,
-    });
-    const excellent = scorePronunciation(makeResult(98, '4.9'), '苹果');
-    const uneven = scorePronunciation(makeResult(98, '4.2'), '苹果');
-    const noDetail = scorePronunciation({ totalScore: 100, pronunciationScore: 100, stars: 5, rawXml: '<read_word />' }, '苹果');
-    const partialDetail = scorePronunciation({ totalScore: 100, pronunciationScore: 100, toneScore: 100, stars: 5, rawXml: '<read_word><syll content="苹" syll_score="5"/><syll content="果"/></read_word>' }, '苹果');
-    let wrongPhoneRejected = false;
-    try { scorePronunciation(makeResult(98, '4.9', 128), '苹果'); } catch { wrongPhoneRejected = true; }
-    return { excellent, uneven, noDetail, partialDetail, wrongPhoneRejected, fourStarBoundary: strictPronunciationStars(97) };
+    const { parseXfyunIseResult } = await import('/src/services/speech/xfyunIse.ts');
+    const excellent = scorePronunciation(parseXfyunIseResult('<read_word total_score="98" phone_score="98" tone_score="98"/>'));
+    const low = scorePronunciation(parseXfyunIseResult('<read_sentence total_score="98" accuracy_score="4"/>'));
+    const mismatch = scorePronunciation(parseXfyunIseResult('<read_word total_score="98" phone_score="98" tone_score="98"><syll content="花" dp_message="128"/></read_word>'));
+    return { excellent, low, mismatch, fourStarBoundary: strictPronunciationStars(97) };
   });
   assert.equal(pronunciationChecks.excellent.stars, 5);
-  assert(pronunciationChecks.uneven.stars < 5);
-  assert(pronunciationChecks.noDetail.stars < 5);
-  assert(pronunciationChecks.partialDetail.stars < 5);
-  assert(pronunciationChecks.wrongPhoneRejected);
+  assert.equal(pronunciationChecks.low.scores.pronunciationClarity, 4);
+  assert.equal(pronunciationChecks.mismatch.stars, 0);
+  assert.equal(pronunciationChecks.mismatch.scores.pronunciationClarity, undefined);
   assert.equal(pronunciationChecks.fourStarBoundary, 4);
-  console.log('PASS 正音满星需要整体和逐音节都优秀，异常音与缺少证据不误判满星');
+  console.log('PASS 百分制低分不放大，错读进入复核且无自动成绩');
   await page.locator('input[name="name"]').fill('流程测试');
   await page.locator('select[name="gender"]').selectOption('female');
   await page.locator('select[name="age"]').selectOption('6');
@@ -122,22 +116,22 @@ try {
   await page.goto(url); await page.locator('.ability-observations').waitFor();
   assert.equal(await page.locator('.ability-observations > div').count(), 3);
   console.log('PASS 三个动物、三项报告、扫码报告');
-  await page.goto('http://127.0.0.1:5173/');
+  await page.goto(baseUrl + '/');
   await page.evaluate(async (id) => {
     const db = await import('/src/services/storage/database.ts');
     const old = await db.getSession(id);
     await db.saveSession({ ...old, id: 'test-large', stage: 'B', status: 'running', tutorialSeen: [], results: ['A1','A2','A5'].map((moduleId) => ({ moduleId, questionId: `${moduleId}-001`, status: 'not_started' })) });
   }, sessionId);
-  await page.goto('http://127.0.0.1:5173/assessment/test-large/A1'); await skip();
+  await page.goto(baseUrl + '/assessment/test-large/A1'); await skip();
   assert.equal(await page.locator('.course-task-picker button').count(), 2);
   assert(await page.locator('.course-sentence').isVisible());
   await screenshot('大阶段正音');
-  await page.goto('http://127.0.0.1:5173/assessment/test-large/A5'); await skip();
+  await page.goto(baseUrl + '/assessment/test-large/A5'); await skip();
   assert(await page.getByRole('heading', { name: '森林广播员' }).isVisible());
   await page.setViewportSize({ width: 390, height: 844 });
   await button('评测说明').click(); await screenshot('手机说明'); await skip();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-  await page.goto('http://127.0.0.1:5173/assessment/test-large/A1');
+  await page.goto(baseUrl + '/assessment/test-large/A1');
   await page.locator('.course-sentence').waitFor();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -145,7 +139,50 @@ try {
   await screenshot('手机正音');
   await page.setViewportSize({ width: 1920, height: 1080 });
   await screenshot('桌面大阶段');
-  await page.goto('http://127.0.0.1:5173/v3'); await page.waitForURL('http://127.0.0.1:5173/');
+  await page.goto(baseUrl + '/v3'); await page.waitForURL(baseUrl + '/');
   assert.equal(errors.length, 0, errors.join('\n'));
   console.log('PASS 大阶段内容、手机弹层、独立入口撤下、无浏览器异常');
+  const latencyPage = await context.newPage();
+  await latencyPage.goto(baseUrl + '/profile');
+  const startup = await latencyPage.evaluate(async () => {
+    const packets = [];
+    const originalFetch = window.fetch;
+    const originalWebSocket = window.WebSocket;
+    window.fetch = (input, init) => String(input).includes('/api/xfyun/ise-auth')
+      ? Promise.resolve(new Response(JSON.stringify({ appId: 'test', url: 'wss://test/ise', iatUrl: 'wss://test/iat' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      : originalFetch(input, init);
+    class SlowWebSocket extends EventTarget {
+      static OPEN = 1;
+      readyState = 0;
+      constructor(url) {
+        super(); this.url = url;
+        setTimeout(() => { this.readyState = 1; this.dispatchEvent(new Event('open')); }, 1600);
+      }
+      send(value) { packets.push({ url: this.url, value: JSON.parse(value) }); }
+      close() { this.readyState = 3; }
+    }
+    window.WebSocket = SlowWebSocket;
+    try {
+      const { startXfyunIse } = await import('/src/services/speech/xfyunIse.ts');
+      let volumeUpdates = 0;
+      const start = performance.now();
+      const session = await startXfyunIse({ referenceText: '苹果', onVolume: () => { volumeUpdates += 1; } });
+      const captureDelay = performance.now() - start;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const capturedBeforeConnection = volumeUpdates > 0 && packets.length === 0;
+      await session.ready;
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      const bothServicesReceivedAudio = ['ise', 'iat'].every((service) => packets.some((packet) => packet.url.endsWith(service) && packet.value.data?.audio || packet.url.endsWith(service) && packet.value.business?.cmd === 'auw'));
+      session.cancel();
+      return { captureDelay, capturedBeforeConnection, bothServicesReceivedAudio };
+    } finally {
+      window.fetch = originalFetch;
+      window.WebSocket = originalWebSocket;
+    }
+  });
+  assert(startup.captureDelay < 1200, `麦克风启动耗时 ${startup.captureDelay.toFixed(0)}ms`);
+  assert(startup.capturedBeforeConnection, '连接期间应已开始本地收音');
+  assert(startup.bothServicesReceivedAudio, '连接后两条服务都应收到暂存音频');
+  await latencyPage.close();
+  console.log('PASS 点击后先收音，慢速语音连接建立后补发开头音频');
 } finally { await browser.close(); }

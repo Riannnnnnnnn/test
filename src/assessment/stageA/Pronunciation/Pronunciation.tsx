@@ -7,7 +7,7 @@ import { scorePronunciation } from "@/services/scoring/pronunciation";
 import { getCourseTasks } from "@/config/courseTasks";
 import { TaskPicker } from "@/assessment/common/TaskPicker/TaskPicker";
 
-export function Pronunciation({ onResultChange, result, stage, items, onSelectItem }: AssessmentModuleProps) {
+export function Pronunciation({ onResultChange, result, stage, studentGrade, items, onSelectItem }: AssessmentModuleProps) {
   const { content } = useSiteContent();
   const module = content.modules.A1;
   const tasks = stage ? getCourseTasks(stage, "A1") : [];
@@ -22,10 +22,12 @@ export function Pronunciation({ onResultChange, result, stage, items, onSelectIt
   const picture = imageUrl ? <div className="module-uploaded-image"><img src={imageUrl} alt={selected?.text ?? module.imageAlt} /></div> : <div className="picture-placeholder picture-placeholder--apple" role="img" aria-label={module.imageAlt}><span className="apple-leaf" /></div>;
   const saveEvaluation = (evaluation: XfyunIseResult) => {
     if (evaluation.sessionId === "preview") return onResultChange({ status: "running", startTime: result.startTime ?? new Date().toISOString(), autoScores: undefined, rawResult: { provider: "smart-preview", evaluatedAt: new Date().toISOString() } });
-    const calibrated = stage ? scorePronunciation(evaluation, word) : undefined;
+    const calibrated = scorePronunciation(evaluation);
     return onResultChange({ status: "running", startTime: result.startTime ?? new Date().toISOString(), transcript: evaluation.transcript,
-      autoScores: { ...result.autoScores, pronunciationClarity: calibrated?.pronunciationClarity ?? evaluation.totalScore, initialStrength: calibrated?.initialStrength ?? evaluation.pronunciationScore ?? evaluation.totalScore, vowelFullness: calibrated?.vowelFullness ?? evaluation.toneScore ?? evaluation.totalScore, finalClosure: calibrated?.finalClosure ?? evaluation.totalScore },
-      rawResult: { ...result.rawResult, provider: "smart-speech", intelligentStars: calibrated?.stars ?? evaluation.stars, speechSessionId: evaluation.sessionId, transcript: evaluation.transcript, pronunciationScore: evaluation.pronunciationScore, toneScore: evaluation.toneScore, evaluatedAt: new Date().toISOString() } });
+      autoScores: calibrated.scores,
+      rawResult: { provider: "smart-speech", scoringVersion: "ise-evidence-v2", intelligentStars: calibrated.stars,
+        speechSessionId: evaluation.sessionId, transcript: evaluation.transcript, referenceText: word,
+        evidence: evaluation, evaluatedAt: new Date().toISOString() } });
   };
   const resetEvaluation = () => onResultChange({ status: "running", autoScores: undefined, teacherScores: undefined, transcript: undefined, rawResult: undefined });
   const initialLabel = stage === "A" && selected?.title.startsWith("声母 ") ? selected.title.replace("声母 ", "") : undefined;
@@ -44,6 +46,6 @@ export function Pronunciation({ onResultChange, result, stage, items, onSelectIt
         </div>}
       </div>
     </div>
-    <div className="pron__console"><SmartSpeechEvaluator featured strictRating={Boolean(stage)} sentence={stage === "B"} referenceText={word} initialScore={result.autoScores?.pronunciationClarity} initialPreview={result.rawResult?.provider === "smart-preview"} dimensionRatings={result.autoScores} onReset={resetEvaluation} onEvaluated={saveEvaluation} /></div>
+    <div className="pron__console"><SmartSpeechEvaluator studentGrade={studentGrade} evidence={result.rawResult?.evidence as XfyunIseResult | undefined} featured strictRating sentence={stage === "B"} referenceText={word} initialScore={result.autoScores?.pronunciationClarity} initialPreview={result.rawResult?.provider === "smart-preview"} dimensionRatings={result.autoScores} onReset={resetEvaluation} onEvaluated={saveEvaluation} /></div>
   </Card>;
 }

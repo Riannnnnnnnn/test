@@ -847,3 +847,9 @@
   .pronunciation-card__syllable span { font-size: 13px; }
   .pronunciation-card__syllable strong { font-size: 34px; }
 }
+
+.speech-evidence { padding: 12px; text-align: left; font-size: 14px; }
+.speech-evidence dl { display: flex; flex-wrap: wrap; gap: 12px; }
+.speech-evidence dd { margin: 0; font-weight: bold; }
+.reading-evidence { padding: 20px; background: #faf7ff; border-radius: 16px; margin: 20px 0; }
+.reading-evidence article { border-top: 1px solid #ded4f1; padding: 10px 0; }
