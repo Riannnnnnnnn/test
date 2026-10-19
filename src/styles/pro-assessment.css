@@ -225,6 +225,15 @@
 .vc-dim { display: grid; justify-items: center; gap: 9px; padding: 12px 6px 11px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 14px; background: rgba(255, 255, 255, .06); transition: background .5s var(--pro-ease), border-color .5s, box-shadow .5s; }
 .vc-dim__label { color: rgba(255, 255, 255, .8); font-size: 13px; font-weight: 700; white-space: nowrap; }
 .vc-dim__stars { display: block; font-size: clamp(15px, 1.25vw, 18px); line-height: 0; color: var(--pro-gold); }
+.vc-dim__result { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 22px; font-size: 15px; white-space: nowrap; }
+.vc-dim__result span { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; font-size: 13px; font-weight: 900; }
+.vc-dim__result--pending { color: rgba(255, 255, 255, .72); }
+.vc-dim__result--pending span { background: rgba(255, 255, 255, .14); }
+.vc-dim__result--success { color: #8ef0b6; }
+.vc-dim__result--success span { background: rgba(88, 224, 160, .25); }
+.vc-dim__result--review { color: #ffe58d; }
+.vc-dim__result--review span { background: rgba(255, 212, 76, .22); }
+.vc-dim.is-review { border-color: rgba(255, 212, 76, .45); background: rgba(255, 212, 76, .1); }
 .vc-dim .rounded-star-rating { gap: 4px; }
 .vc-dim .rounded-star path { stroke: rgba(255, 255, 255, .3); stroke-width: 48; }
 .vc-dim .rounded-star.is-filled path { fill: var(--pro-gold); stroke: var(--pro-gold); }
@@ -235,6 +244,13 @@
 .vc-dim.is-complete .rounded-star:nth-child(4) { animation-delay: .27s; } .vc-dim.is-complete .rounded-star:nth-child(5) { animation-delay: .36s; }
 
 .vc__error { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid rgba(255, 140, 140, .42); border-radius: 12px; background: rgba(255, 90, 95, .13); animation: pro-rise .3s var(--pro-ease) both; }
+.vc__review { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 14px; border: 1px solid rgba(255, 128, 137, .65); border-radius: 12px; background: rgba(230, 54, 76, .2); color: #fff; font-size: 13px; line-height: 1.45; }
+.vc__review-mark { flex: 0 0 26px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: #ff6673; color: #fff; font-size: 21px; font-weight: 900; line-height: 1; }
+.vc__review strong { flex: 0 0 auto; font-size: 15px; white-space: nowrap; }
+.vc__review--uncertain { border-color: rgba(255, 212, 76, .65); background: rgba(255, 212, 76, .14); }
+.vc__review--uncertain .vc__review-mark { background: #ffd44c; color: #3f1a8c; font-size: 17px; }
+.vc__review--pronunciation { border-color: rgba(255, 212, 76, .65); background: rgba(255, 212, 76, .14); }
+.vc__review--pronunciation .vc__review-mark { background: #ffd44c; color: #3f1a8c; font-size: 17px; }
 .vc__error--mismatch { border-color: rgba(255, 212, 76, .5); background: rgba(255, 212, 76, .12); }
 .vc__error-retry { flex: 0 0 auto; min-height: 36px; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px 0 10px; border: 1px solid rgba(255, 212, 76, .7); border-radius: 999px; background: rgba(255, 212, 76, .1); color: var(--pro-gold); font-weight: 800; cursor: pointer; transition: background .2s, transform .2s var(--pro-ease); }
 .vc__error-retry:hover { background: rgba(255, 212, 76, .22); transform: translateY(-1px); }

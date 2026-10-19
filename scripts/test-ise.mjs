@@ -7,7 +7,7 @@ try {
   await page.goto(process.env.E2E_BASE_URL || 'http://127.0.0.1:5173');
   const checks = await page.evaluate(async () => {
     const { parseXfyunIseResult: parse, buildIseBusiness: business, create16kResampler } = await import('/src/services/speech/xfyunIse.ts');
-    const { scorePronunciation: map } = await import('/src/services/scoring/pronunciation.ts');
+    const { scorePronunciation: map, speechDimensionStars } = await import('/src/services/scoring/pronunciation.ts');
     const results = [];
     const check = (name, condition) => results.push({ name, passed: Boolean(condition) });
     const sentence = (attributes, children = '') => `<xml><read_sentence><read_sentence total_score="98" ${attributes}>${children}</read_sentence></read_sentence></xml>`;
@@ -19,8 +19,9 @@ try {
       const result = parse(sentence('accuracy_score="99"', `<syll content="花" dp_message="${flag}"><phone dp_message="${flag}" perr_msg="${flag}"/></syll>`));
       check(`${kind}不被高总分掩盖且不重复计数`, result.issues.length === 1 && result.issues[0].kind === kind && result.stars === 0 && !('pronunciationClarity' in map(result).scores));
     }
-    const tone = parse(sentence('accuracy_score="99"', '<syll content="花"><phone dp_message="0" perr_msg="2"/></syll>'));
+    const tone = parse(sentence('accuracy_score="99" phone_score="100" tone_score="100"', '<syll content="花"><phone dp_message="0" perr_msg="2"/></syll>'));
     check('声调错误保留为可复核证据', tone.issues[0].kind === '声调错误' && tone.reviewReasons.length > 0);
+    check('单个声调错误只限制对应星级，不把声韵清空', speechDimensionStars(tone, 'toneScore') === 4 && speechDimensionStars(tone, 'pronunciationScore') === 5 && speechDimensionStars(tone, 'accuracyScore') === 4);
     for (const attr of ['is_rejected="true"', 'except_info="28673"', 'except_info="99999"']) {
       check(`拒评或异常不生成成绩 ${attr}`, !('pronunciationClarity' in map(parse(sentence(`accuracy_score="99" ${attr}`))).scores));
     }
@@ -28,6 +29,8 @@ try {
     check('空字段不变成零或总分', missing.accuracyScore === undefined && missing.reviewReasons.length > 0);
     const word = parse('<read_word total_score="98" phone_score="60" tone_score="40"/>');
     check('字词采用声韵声调较低值，不伪造准确度', word.accuracyScore === undefined && map(word).scores.pronunciationClarity === 40);
+    const wordTone = parse('<read_word total_score="100" phone_score="100" tone_score="100"><syll content="苹"><phone perr_msg="2"/></syll></read_word>');
+    check('字词局部声调问题保留分项星级且不冒充满分', speechDimensionStars(wordTone, 'pronunciationScore') === 5 && speechDimensionStars(wordTone, 'toneScore') === 4 && !('pronunciationClarity' in map(wordTone).scores));
     for (const raw of ['<broken>', '<read_sentence total_score="101"/>', '<read_sentence><sentence total_score="90"/></read_sentence>']) {
       let failed = false; try { parse(raw); } catch { failed = true; }
       check(`非法XML/分数/节点拒绝: ${raw}`, failed);
@@ -40,6 +43,7 @@ try {
     check('文本保留标点且只有一个BOM', params.text === '\uFEFF花开了。');
     check('学前年级不虚构grade', !('grade' in params));
     check('字词不发送grade', !('grade' in business({ referenceText: '花', category: 'read_syllable', studentGrade: 'grade-1' })));
+    check('字词使用严格检错，句子保留普通门限', business({ referenceText: '苹果', category: 'read_word' }).check_type === 'hard' && params.check_type === 'common');
     check('音频与扩展能力参数', params.aue === 'raw' && params.auf === 'audio/L16;rate=16000' && params.check_type === 'common' && params.extra_ability === 'multi_dimension;syll_phone_err_msg');
     let emptyFailed = false; try { business({ referenceText: '   ' }); } catch { emptyFailed = true; }
     check('空题目禁止启动', emptyFailed);
@@ -69,8 +73,8 @@ try {
   for (const id of ['ise-high', 'ise-review']) {
     await page.goto(`${process.env.E2E_BASE_URL || 'http://127.0.0.1:5173'}/report/${id}`);
     await page.locator('.reading-evidence').waitFor();
-    assert.match(await page.locator('.reading-evidence').innerText(), /花：替换/);
-    assert.match(await page.locator('.reading-evidence').innerText(), /暂不生成自动星级/);
+    assert.match(await page.locator('.reading-evidence').innerText(), /花开了/);
+    assert.doesNotMatch(await page.locator('.reading-evidence').innerText(), /引擎总分|准确度：/);
   }
   console.log('Report regression: review evidence remains visible with no score and with a high teacher/summary score.');
 } finally {

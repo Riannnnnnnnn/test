@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { VoiceConsole } from "@/assessment/common/VoiceConsole/VoiceConsole";
+import { VoiceConsole, type VoiceDimension } from "@/assessment/common/VoiceConsole/VoiceConsole";
 import { warmMicrophone } from "@/services/audio/microphone";
-import { SmartEvaluationUnavailableError, SpeechContentMismatchError, prepareSpeechAuth, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
-import { strictPronunciationStars } from "@/services/scoring/pronunciation";
+import { SmartEvaluationUnavailableError, SpeechContentMismatchError, matchesReferenceText, prepareSpeechAuth, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
+import { hasBlockingSpeechReview, speechDimensionStars, strictPronunciationStars } from "@/services/scoring/pronunciation";
+import { getSpeechReviewFeedback } from "@/services/speech/reviewFeedback";
 
 interface SmartSpeechEvaluatorProps {
   sentence?: boolean;
@@ -31,7 +32,6 @@ function formatTime(seconds: number): string {
 const dimensions = [
   { key: "pronunciationScore", label: "声韵清晰" },
   { key: "toneScore", label: "声调准确" },
-  { key: "accuracyScore", label: "朗读准确度" },
 ];
 
 export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, initialScore, initialPreview = false, dimensionRatings, sentence = false, strictRating = false, onReset, onEvaluated }: SmartSpeechEvaluatorProps) {
@@ -49,6 +49,7 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
   const [errorKind, setErrorKind] = useState<"mismatch" | "general" | "">("");
   const [isPreview, setIsPreview] = useState(initialPreview);
   const [networkReady, setNetworkReady] = useState(false);
+  const [latestEvidence, setLatestEvidence] = useState<XfyunIseResult>();
   const volumeChanged = (value: number) => {
     setVolume((current) => current * .58 + value * .42);
     if (!listening.current || autoFinishing.current) return;
@@ -58,9 +59,11 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
       silenceSince.current = 0;
       return;
     }
-    if (!heardSince.current || now - heardSince.current < 350) return;
+    // Short children's words need enough trailing audio for IAT to avoid
+    // interpreting only the first sound as the whole answer.
+    if (!heardSince.current || now - heardSince.current < (sentence ? 350 : 550)) return;
     if (!silenceSince.current) silenceSince.current = now;
-    if (now - silenceSince.current >= (sentence ? 1500 : 650)) {
+    if (now - silenceSince.current >= (sentence ? 1500 : 1050)) {
       autoFinishing.current = true;
       void finish();
     }
@@ -92,6 +95,7 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
     setSeconds(0);
     setIsPreview(false);
     setNetworkReady(false);
+    setLatestEvidence(undefined);
     setState("connecting");
     try {
       const sessionPromise = startXfyunIse({ referenceText, studentGrade, category: sentence ? "read_sentence" : referenceText.length <= 1 ? "read_syllable" : "read_word", onVolume: volumeChanged });
@@ -155,6 +159,7 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
       session.current = undefined;
       if (!mounted.current) return;
       await onEvaluated(result);
+      setLatestEvidence(result);
       setState("done");
     } catch (reason) {
       if (!mounted.current) return;
@@ -173,16 +178,31 @@ export function SmartSpeechEvaluator({ referenceText, studentGrade, evidence, in
   const isBusy = state === "connecting" || state === "processing";
   const isListening = state === "listening";
   const isDone = state === "done";
+  const finalEvidence = evidence ?? latestEvidence;
+  const reviewFeedback = finalEvidence ? getSpeechReviewFeedback(finalEvidence, referenceText) : undefined;
+  const needsReview = isDone && reviewFeedback !== undefined && reviewFeedback.kind !== "pronunciation";
+  const hasPronunciationAdvice = isDone && reviewFeedback?.kind === "pronunciation";
   const micLabel = isListening ? "正在识别" : isBusy ? "请稍候" : isDone ? "再测一次" : "点击说话";
   const micAria = isListening ? "正在自动识别" : isBusy ? "正在处理语音" : isDone ? "重新智能评测" : "开始智能评测";
-  const headline = isListening ? "正在听你说话" : state === "connecting" ? "正在准备收音" : state === "processing" ? "正在分析声音" : isDone ? "本次表达观察" : state === "error" ? "没有听清，再来一次" : "准备好就说出来";
-  const hint = isPreview ? "智能服务未就绪，请使用教师评价" : isListening ? networkReady ? "说完后停顿一下，系统会自动结束" : "已开始收音，正在连接评测服务" : state === "connecting" ? "正在打开麦克风" : state === "processing" ? "正在生成评分" : isDone ? "评测完成" : "";
-  const dimensionItems = dimensions.map(({ key, label }) => {
-    const score = evidence ? evidence[key as "accuracyScore" | "pronunciationScore" | "toneScore"] : dimensionRatings?.[key];
-    return { key, label, done: score !== undefined && !evidence?.reviewReasons?.length, stars: evidence?.reviewReasons?.length ? 0 : strictRating ? strictPronunciationStars(score) : getStars(score) };
+  const headline = isListening ? "正在听你说话" : state === "connecting" ? "正在准备收音" : state === "processing" ? "正在分析声音" : needsReview || hasPronunciationAdvice ? reviewFeedback?.title : isDone ? "本次表达观察" : state === "error" ? "没有听清，再来一次" : "准备好就说出来";
+  const hint = isPreview ? "智能服务未就绪，请使用教师评价" : isListening ? networkReady ? "说完后停顿一下，系统会自动结束" : "已开始收音，正在连接评测服务" : state === "connecting" ? "正在打开麦克风" : state === "processing" ? "正在生成评分" : needsReview ? "未生成自动星级，可重测或请老师评价" : hasPronunciationAdvice ? "已显示分项星级，请老师结合实际发音评价" : isDone ? "评测完成" : "";
+  const dimensionItems: VoiceDimension[] = dimensions.map(({ key, label }) => {
+    const dimensionKey = key as "pronunciationScore" | "toneScore";
+    const score = finalEvidence ? finalEvidence[dimensionKey] : dimensionRatings?.[key];
+    const blocked = finalEvidence ? hasBlockingSpeechReview(finalEvidence) : false;
+    return { key, label, done: score !== undefined && !blocked, stars: finalEvidence ? speechDimensionStars(finalEvidence, dimensionKey) : strictRating ? strictPronunciationStars(score) : getStars(score) };
   });
+  if (sentence) {
+    const score = finalEvidence?.accuracyScore ?? dimensionRatings?.accuracyScore;
+    dimensionItems.push({ key: "accuracyScore", label: "朗读准确度", done: score !== undefined && !(finalEvidence && hasBlockingSpeechReview(finalEvidence)), stars: finalEvidence ? speechDimensionStars(finalEvidence, "accuracyScore") : strictRating ? strictPronunciationStars(score) : getStars(score) });
+  } else {
+    const matched = Boolean(isDone && !isPreview && finalEvidence?.transcript && matchesReferenceText(finalEvidence.transcript, referenceText) && !finalEvidence.reviewReasons?.length);
+    const review = Boolean(isDone && !isPreview && finalEvidence && !matched);
+    dimensionItems.push({ key: "wordMatch", label: "词语匹配", done: matched, stars: 0, statusText: matched ? "已匹配" : review ? "需复核" : "待检测", statusTone: matched ? "success" : review ? "review" : "pending" });
+  }
 
-  return <VoiceConsole state={state} level={volume} timer={formatTime(seconds)} headline={headline} hint={hint} micLabel={micLabel} micAria={micAria} onStart={start} onPrepare={() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }} dimensions={dimensionItems} dimensionsAria="三个维度的智能评星">
+  return <VoiceConsole state={needsReview ? "error" : state} level={volume} timer={formatTime(seconds)} headline={headline} hint={hint} micLabel={micLabel} micAria={micAria} onStart={start} onPrepare={() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }} dimensions={dimensionItems} dimensionsAria={sentence ? "三个维度的智能评星" : "声韵、声调和词语匹配结果"}>
+    {isDone && reviewFeedback && <div className={`vc__review vc__review--${reviewFeedback.kind}`} role="alert"><span className="vc__review-mark" aria-hidden="true">{reviewFeedback.kind === "reading" ? "×" : "!"}</span><strong>{reviewFeedback.title}</strong><span>{reviewFeedback.message}</span></div>}
     {error && <div className={`vc__error ${errorKind === "mismatch" ? "vc__error--mismatch" : ""}`} role="alert">
       <button type="button" className="vc__error-retry" onClick={start} aria-label="重新评测" title="重新评测"><img src="/assets/icons/refresh.svg" alt="" /><strong>{errorKind === "mismatch" ? "再试一次" : "重新评测"}</strong></button>
       <small>{error}</small>

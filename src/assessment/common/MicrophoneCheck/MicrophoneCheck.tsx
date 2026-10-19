@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Waveform } from "@/assessment/common/VoiceConsole/Waveform";
 import { Button } from "@/components/ui";
 import { acquireMicrophone, releaseMicrophone } from "@/services/audio/microphone";
 
@@ -80,7 +81,7 @@ export function MicrophoneCheck({ onPassedChange }: MicrophoneCheckProps) {
         if (run !== generation.current) return;
         analyser.getFloatTimeDomainData(samples);
         const rms = Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
-        setLevel(Math.min(100, rms * 600));
+        setLevel(Math.min(1, rms * 5));
         if (rms > .015) {
           if (!soundSince) soundSince = performance.now();
           if (performance.now() - soundSince > 300) {
@@ -105,7 +106,7 @@ export function MicrophoneCheck({ onPassedChange }: MicrophoneCheckProps) {
     <div className="microphone-check__body">
       <strong>{status === "success" ? "✓ 麦克风正常" : "麦克风测试"}</strong>
       <p role="status">{message}</p>
-      {status === "listening" && <div className="microphone-check__meter" role="meter" aria-label="麦克风输入音量" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level)}><span style={{ width: `${level}%` }} /></div>}
+      {status === "listening" && <div className="microphone-check__wave" role="meter" aria-label="麦克风输入音量" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level * 100)}><Waveform level={level} mode="live" /></div>}
       <small>仅检测收音，不保存录音。收到声音后才能开始正式评测。</small>
     </div>
     <Button variant="secondary" onClick={active ? stop : start}>{active ? "停止测试" : status === "idle" ? "测试麦克风" : "重新测试麦克风"}</Button>

@@ -10,7 +10,7 @@ try {
   await context.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = async () => {
       const audio = new AudioContext(), oscillator = audio.createOscillator(), gain = audio.createGain(), dest = audio.createMediaStreamDestination();
-      gain.gain.value = .24; globalThis.testMicrophoneGain = gain; oscillator.connect(gain).connect(dest); oscillator.start();
+      gain.gain.value = globalThis.silenceMicrophone ? 0 : .24; globalThis.testMicrophoneGain = gain; oscillator.connect(gain).connect(dest); oscillator.start();
       if (globalThis.silenceAfter !== undefined) setTimeout(() => { gain.gain.value = 0; }, globalThis.silenceAfter);
       return dest.stream;
     };
@@ -24,16 +24,19 @@ try {
   const pronunciationChecks = await page.evaluate(async () => {
     const { scorePronunciation, strictPronunciationStars } = await import('/src/services/scoring/pronunciation.ts');
     const { parseXfyunIseResult } = await import('/src/services/speech/xfyunIse.ts');
+    const { getSpeechReviewFeedback } = await import('/src/services/speech/reviewFeedback.ts');
     const excellent = scorePronunciation(parseXfyunIseResult('<read_word total_score="98" phone_score="98" tone_score="98"/>'));
     const low = scorePronunciation(parseXfyunIseResult('<read_sentence total_score="98" accuracy_score="4"/>'));
-    const mismatch = scorePronunciation(parseXfyunIseResult('<read_word total_score="98" phone_score="98" tone_score="98"><syll content="花" dp_message="128"/></read_word>'));
-    return { excellent, low, mismatch, fourStarBoundary: strictPronunciationStars(97) };
+    const mismatchResult = parseXfyunIseResult('<read_word total_score="98" phone_score="98" tone_score="98"><syll content="花" dp_message="128"/></read_word>');
+    const mismatch = scorePronunciation(mismatchResult);
+    return { excellent, low, mismatch, fourStarBoundary: strictPronunciationStars(97), review: getSpeechReviewFeedback(mismatchResult, '苹果') };
   });
   assert.equal(pronunciationChecks.excellent.stars, 5);
   assert.equal(pronunciationChecks.low.scores.pronunciationClarity, 4);
   assert.equal(pronunciationChecks.mismatch.stars, 0);
   assert.equal(pronunciationChecks.mismatch.scores.pronunciationClarity, undefined);
   assert.equal(pronunciationChecks.fourStarBoundary, 4);
+  assert.equal(pronunciationChecks.review.kind, 'reading');
   console.log('PASS 百分制低分不放大，错读进入复核且无自动成绩');
   await page.locator('input[name="name"]').fill('流程测试');
   await page.locator('select[name="gender"]').selectOption('female');
@@ -54,11 +57,13 @@ try {
   await button('测试麦克风').click();
   await page.locator('.microphone-check--success').waitFor();
   assert(await button('进入评测').isEnabled());
+  await page.evaluate(() => { globalThis.silenceMicrophone = true; });
   await button('重新测试麦克风').click();
   assert(await button('进入评测').isDisabled());
   await button('停止测试').click();
   assert(await button('进入评测').isDisabled());
   await page.locator('.microphone-check--idle').waitFor();
+  await page.evaluate(() => { globalThis.silenceMicrophone = false; });
   await page.locator('.microphone-check > button').click();
   await page.locator('.microphone-check--success').waitFor();
   assert(await button('进入评测').isEnabled());
@@ -80,7 +85,51 @@ try {
   await screenshot('布局检查');
   await button('声母 p：苹果').click();
   assert.equal(await page.locator('.course-word').textContent(), '苹果');
+  assert.equal(await page.locator('.vc-dim').last().locator('.vc-dim__label').textContent(), '词语匹配');
+  assert.equal(await page.locator('.vc-dim').last().locator('.vc-dim__result').textContent(), '·待检测');
   assert(await page.locator('.pron__art img').evaluate((image) => image.complete && image.naturalWidth > 0));
+  await page.evaluate(async () => {
+    const db = await import('/src/services/storage/database.ts');
+    const id = location.pathname.split('/')[2];
+    const saved = await db.getSession(id);
+    const result = saved.results.find((entry) => entry.moduleId === 'A1');
+    const questionId = result.activeItemId;
+    await db.saveSession({ ...saved, results: saved.results.map((entry) => entry.moduleId !== 'A1' ? entry : {
+      ...entry, items: { ...entry.items, [questionId]: { moduleId: 'A1', questionId, status: 'running',
+        rawResult: { provider: 'smart-speech', scoringVersion: 'ise-evidence-v2', referenceText: '苹果', evidence: {
+          totalScore: 98, stars: 0, rawXml: '', issues: [{ text: '苹', kind: '替换' }], reviewReasons: ['检测到错读或发音问题']
+        } } } }
+    }) });
+  });
+  await page.reload();
+  await page.locator('.vc__review-mark').waitFor();
+  assert.equal(await page.locator('.vc__review-mark').textContent(), '×');
+  assert.equal(await page.locator('.vc__chip').textContent(), '需重试');
+  assert.equal(await page.locator('.vc-dim').last().locator('.vc-dim__result').textContent(), '!需复核');
+  await screenshot('正音-读错与词语匹配');
+  await page.goto(`${baseUrl}/report/${page.url().split('/')[4]}`);
+  await page.getByRole('heading', { name: '正音观察' }).waitFor();
+  assert.equal(await page.locator('.reading-evidence').getByText(/引擎总分|准确度：/).count(), 0);
+  await page.goBack();
+  await page.locator('.vc__review-mark').waitFor();
+  await page.evaluate(async () => {
+    const db = await import('/src/services/storage/database.ts');
+    const id = location.pathname.split('/')[2];
+    const saved = await db.getSession(id);
+    await db.saveSession({ ...saved, results: saved.results.map((entry) => entry.moduleId !== 'A1' ? entry : {
+      ...entry, items: Object.fromEntries(Object.entries(entry.items).map(([questionId, item]) => [questionId, questionId !== entry.activeItemId ? item : {
+        ...item, rawResult: { ...item.rawResult, evidence: {
+          totalScore: 96, pronunciationScore: 92, toneScore: 90, transcript: '苹果', stars: 4, rawXml: '', issues: [], reviewReasons: []
+        } }
+      }]))
+    }) });
+  });
+  await page.reload();
+  await page.locator('.vc-dim__result--success').waitFor();
+  assert.equal(await page.locator('.vc-dim').last().locator('.vc-dim__result').textContent(), '✓已匹配');
+  assert.equal(await page.locator('.vc-dim.is-complete').count(), 3);
+  await button('重测').click();
+  assert.equal(await page.locator('.vc__review-mark').count(), 0);
   await button('教师星级评价').click();
   await button('保存评价').click();
   assert.equal(await page.locator('.course-task-picker button.is-complete').count(), 1);

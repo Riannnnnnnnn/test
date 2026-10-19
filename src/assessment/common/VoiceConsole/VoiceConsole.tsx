@@ -4,7 +4,7 @@ import { Waveform, type WaveMode } from "./Waveform";
 
 export type VoiceState = "idle" | "connecting" | "listening" | "processing" | "done" | "error";
 
-export interface VoiceDimension { key: string; label: string; stars: number; done: boolean; }
+export interface VoiceDimension { key: string; label: string; stars: number; done: boolean; statusText?: string; statusTone?: "success" | "review" | "pending"; }
 
 interface VoiceConsoleProps {
   state: VoiceState;
@@ -60,9 +60,10 @@ export function VoiceConsole({ state, level, timer, headline, hint, micLabel, mi
       <small className="vc__hint">{hint}</small>
     </div>
     <div className="vc__dims" role="group" aria-label={dimensionsAria}>
-      {dimensions.map(({ key, label, stars, done }) => <div className={`vc-dim ${done ? "is-complete" : ""}`} key={key}>
+      {dimensions.map(({ key, label, stars, done, statusText, statusTone }) => <div className={`vc-dim ${done ? "is-complete" : ""} ${statusTone === "review" ? "is-review" : ""}`} key={key}>
         <span className="vc-dim__label">{label}</span>
-        <strong className="vc-dim__stars" aria-label={done ? `${label}${stars}颗星` : `${label}待评测`}><StarRating value={stars} /></strong>
+        {statusText ? <strong className={`vc-dim__result vc-dim__result--${statusTone ?? "pending"}`} aria-label={`${label}：${statusText}`}><span aria-hidden="true">{statusTone === "success" ? "✓" : statusTone === "review" ? "!" : "·"}</span>{statusText}</strong>
+          : <strong className="vc-dim__stars" aria-label={done ? `${label}${stars}颗星` : `${label}待评测`}><StarRating value={stars} /></strong>}
       </div>)}
     </div>
     {children}

@@ -190,7 +190,7 @@ export function buildIseBusiness({ referenceText, category = "read_word", studen
     auf: "audio/L16;rate=16000", aue: "raw", rstcd: "utf8",
     group: studentGrade === "middle-school-plus" ? "youth" : "pupil",
     ...(grade && ["read_sentence", "read_chapter"].includes(category) ? { grade } : {}),
-    check_type: "common", rst: "entirety", ise_unite: "1",
+    check_type: ["read_word", "read_syllable"].includes(category) ? "hard" : "common", rst: "entirety", ise_unite: "1",
     extra_ability: "multi_dimension;syll_phone_err_msg", text: `\uFEFF${text}`,
   };
 }
