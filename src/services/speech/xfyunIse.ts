@@ -120,6 +120,22 @@ export async function classifySpeechContent(result: XfyunIseResult, transcript: 
   const audioIssue = result.reviewReasons?.some((reason) => /拒评|异常|音量|噪声|截幅|音频输入|缺少准确度/.test(reason));
   const pronunciationIssue = result.issues?.some((issue) => ["声韵错误", "声调错误", "声韵及声调错误"].includes(issue.kind));
   const matched = repetitionCount > 0;
+  // 整句朗读：听写几乎不可能和原句逐字一致，所以以讯飞评测的分数为准，不再因为
+  // 听写文字对不上就判“没听清”。真正的音频问题（拒评、没有声音、截幅）仍然不评分；
+  // 背景噪声在评分很高时放行（教室里很常见）；漏读/增读会让完整度和准确度下降，
+  // 并在 scorePronunciation 里封顶为 4 星。
+  if (result.category === "read_sentence" || result.category === "read_chapter") {
+    const hardAudio = result.reviewReasons?.some((reason) => /拒评|异常|音量|截幅|音频输入|缺少准确度/.test(reason));
+    const noiseOnly = result.reviewReasons?.some((reason) => /噪声/.test(reason));
+    const accuracy = result.accuracyScore ?? 0;
+    const integrity = result.integrityScore ?? 100;
+    if (hardAudio) return "uncertain";
+    if (noiseOnly && !(accuracy >= 70 && integrity >= 80)) return "uncertain";
+    if (result.reviewReasons?.some((reason) => reason.includes("引擎检测到内容不匹配")) && accuracy < 70) return "mismatch";
+    if (accuracy >= 60 && integrity >= 70) return "matched";
+    if (!recognized && !alignmentIssue) return "uncertain";
+    return alignmentIssue || pronunciationIssue || accuracy < 60 ? "mismatch" : "uncertain";
+  }
   // A child may self-correct; without word-level audio segmentation we cannot
   // safely score only the final attempt as if the whole recording were correct.
   if (!matched && target && recognized.includes(target)) return "uncertain";
@@ -228,8 +244,14 @@ export function parseXfyunIseResult(rawXml: string, sessionId?: string, category
       issues.push({ text, kind, position });
     }
     const perr = Number(node.getAttribute("perr_msg") ?? 0);
-    // Nonzero alignment flags can be copied into perr_msg; do not count as tone errors.
-    if (node.tagName === "phone" && flag === 0 && perr !== 0) {
+    // Some word results report the sound error on syll rather than phone.
+    // Do not duplicate a phone-level error or mistake a copied alignment flag
+    // for a pronunciation error.
+    const phoneHasError = node.tagName === "syll" && Array.from(node.querySelectorAll("phone"))
+      .some((phone) => Number(phone.getAttribute("dp_message") ?? 0) === 0
+        && [1, 2, 3].includes(Number(phone.getAttribute("perr_msg") ?? 0)));
+    if ((node.tagName === "phone" || node.tagName === "syll" && !phoneHasError)
+      && flag === 0 && [1, 2, 3].includes(perr)) {
       const kind = ({ 1: "声韵错误", 2: "声调错误", 3: "声韵及声调错误" } as Record<number, string>)[perr] ?? `未识别的发音标记 ${perr}`;
       issues.push({ text, kind, position });
     }
@@ -363,8 +385,12 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
   const pumpAudio = () => {
     if (!connected || cancelled || finishedSending) return;
     try {
-      const frame = audioFrames.shift();
-      if (frame) { sendAudio(frame); return; }
+      // 网络慢、连接建立晚时，录音会在本地积压；积压较多时每次多发几帧追赶，
+      // 避免说完后还要按“真实时长”慢慢补传（整句尤其明显）。
+      const batch = audioFrames.length > 6 ? 4 : 1;
+      let sent = 0;
+      while (sent < batch && audioFrames.length) { sendAudio(audioFrames.shift()!); sent += 1; }
+      if (sent) return;
       if (!stopped) return;
       if (!iseSocket || iseSocket.readyState !== WebSocket.OPEN) throw new Error("智能评分连接中断，请重新评测。");
       finishedSending = true;
@@ -498,7 +524,7 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
       let transcriptTimeout = 0;
       const transcript = await Promise.race([
         transcriptPromise.catch(() => ""),
-        new Promise<string>((resolve) => { transcriptTimeout = window.setTimeout(() => resolve(""), 2000); }),
+        new Promise<string>((resolve) => { transcriptTimeout = window.setTimeout(() => resolve(""), category === "read_sentence" || category === "read_chapter" ? 600 : 2000); }),
       ]).finally(() => window.clearTimeout(transcriptTimeout));
       const recognized = normalizeSpeechText(transcript);
       const repetitionCount = await countPronunciationRepetitions(transcript, referenceText);

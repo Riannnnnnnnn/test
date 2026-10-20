@@ -1,0 +1,76 @@
+/* ==========================================================================
+   统一动效层（放在各页面样式之后加载）
+   原则：只动 transform / opacity；关键时刻用弹性曲线；一切可被“减少动态效果”关闭。
+   ========================================================================== */
+:root {
+  --m-ease: cubic-bezier(.22, 1, .36, 1);        /* 快起慢停，通用进入 */
+  --m-spring: cubic-bezier(.34, 1.56, .64, 1);   /* 轻微回弹，用于“弹出” */
+  --m-snap: cubic-bezier(.5, 0, .2, 1);          /* 快速点按反馈 */
+}
+
+/* ---------- 换字 / 换题：文字逐字弹入，插图带一点旋转回正 ---------- */
+@keyframes m-char-in { 0% { opacity: 0; transform: translate3d(0,22px,0) scale(.55) rotate(-6deg); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+@keyframes m-art-in { 0% { opacity: 0; transform: scale(.78) rotate(-5deg); } 100% { opacity: 1; transform: none; } }
+@keyframes m-halo { 0% { opacity: 0; transform: scale(.6); } 100% { opacity: 1; transform: scale(1); } }
+.pron__art { animation: m-art-in .6s var(--m-spring) both; }
+.pron__halo { animation: m-halo .8s .05s var(--m-ease) both; }
+.pron__word { animation: pro-rise .45s .08s var(--m-ease) both; }
+.pron__word .course-word { display: inline-block; animation: m-char-in .62s .12s var(--m-spring) both; transform-origin: 50% 80%; }
+.pron__word .course-sentence { animation: pro-rise .55s .1s var(--m-ease) both; }
+.pron__tag { animation: pro-rise .4s .02s var(--m-ease) both; }
+
+/* ---------- 声母/题目按钮：选中弹一下，标记（✓ / ×）弹出 ---------- */
+.course-task-picker .course-task-picker__buttons button { transition: transform .22s var(--m-spring), background-color .2s ease, border-color .2s ease, box-shadow .2s ease, color .2s ease; }
+.course-task-picker .course-task-picker__buttons button:hover { transform: translateY(-2px) scale(1.06); }
+.course-task-picker .course-task-picker__buttons button:active { transform: scale(.92); transition-duration: .08s; }
+.course-task-picker .course-task-picker__buttons button.is-selected { animation: m-select-pop .42s var(--m-spring); }
+@keyframes m-select-pop { 0% { transform: scale(.86); } 100% { transform: scale(1); } }
+.course-task-picker__meter i { transition: width .6s var(--m-ease); }
+.course-task-picker__summary b { display: inline-block; }
+
+/* ---------- 评星弹窗 ---------- */
+.pron-result { position: relative; }
+.pron-result__badge { animation: m-badge-in .55s .05s var(--m-spring) both; }
+@keyframes m-badge-in { 0% { opacity: 0; transform: translateY(-10px) scale(.7); } 100% { opacity: 1; transform: none; } }
+.pron-result p { animation: pro-rise .45s .15s var(--m-ease) both; }
+.pron-result__star-card { animation: m-card-in .55s .1s var(--m-spring) both; }
+@keyframes m-card-in { 0% { opacity: 0; transform: translateY(16px) scale(.88); } 100% { opacity: 1; transform: none; } }
+/* 星星一颗一颗点亮的间隔放慢一点，更有仪式感；0 星时卡片轻轻“摇头” */
+.pron-result__stars .rounded-star.is-filled { animation-duration: .6s; }
+.pron-result--retry .pron-result__star-card { animation: m-card-in .5s .05s var(--m-spring) both, m-shake .5s .55s var(--m-snap) both; }
+@keyframes m-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 45% { transform: translateX(6px); } 70% { transform: translateX(-3px); } }
+.pron-result--retry .rounded-star:not(.is-filled) { opacity: .55; }
+
+/* 满星庆祝：星屑向四周迸发 */
+.pron-burst { position: absolute; left: 50%; top: 96px; width: 0; height: 0; pointer-events: none; }
+.pron-burst i { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--c, #ffd44c); opacity: 0; animation: m-burst .95s calc(.35s + var(--d, 0s)) var(--m-ease) both; }
+.pron-burst i:nth-child(3n) { border-radius: 2px; width: 8px; height: 14px; }
+@keyframes m-burst { 0% { opacity: 0; transform: translate(0,0) rotate(0) scale(.4); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r, 200deg)) scale(1); } }
+
+/* 自动跳转倒计时条：让孩子和老师都看得见“马上进入下一个” */
+.pron-result__timer { width: min(100%, 310px); height: 6px; border-radius: 999px; background: rgba(110, 70, 200, .14); overflow: hidden; }
+.pron-result__timer i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffd44c, #ff952b); transform-origin: 0 50%; animation: m-timer linear both; }
+@keyframes m-timer { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* 0–4 星弹窗的“再试一次”轻轻呼吸，引导老师优先重试 */
+.dialog-actions .button--secondary { animation: m-nudge 2.6s 1s ease-in-out infinite; }
+@keyframes m-nudge { 0%, 80%, 100% { transform: none; } 90% { transform: scale(1.05); } }
+
+/* ---------- 跳过原因：依次滑入，勾选有回弹 ---------- */
+.skip-reasons p { animation: pro-rise .35s var(--m-ease) both; }
+.skip-reasons__item { animation: pro-rise .45s var(--m-ease) both; transition: transform .2s var(--m-spring), border-color .18s, background-color .18s, box-shadow .2s; }
+.skip-reasons__item:nth-child(1) { animation-delay: .05s; } .skip-reasons__item:nth-child(2) { animation-delay: .11s; }
+.skip-reasons__item:nth-child(3) { animation-delay: .17s; } .skip-reasons__item:nth-child(4) { animation-delay: .23s; }
+.skip-reasons__item:hover { transform: translateX(3px); }
+.skip-reasons__item.is-selected { box-shadow: 0 6px 16px rgba(123, 69, 216, .18); }
+.skip-reasons__item.is-selected i { animation: vc-star-pop .38s var(--m-spring) both; }
+.skip-reasons__tip { transition: color .2s; }
+
+/* ---------- 全局：按钮/卡片悬停与按下统一手感 ---------- */
+.button, .pro-btn { transition-timing-function: var(--m-spring); }
+@media (hover: none) { .course-task-picker .course-task-picker__buttons button:hover, .skip-reasons__item:hover { transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pron__art, .pron__halo, .pron__word, .pron__word .course-word, .pron__tag, .pron-result *, .pron-burst, .skip-reasons *, .dialog-actions .button--secondary.course-task-picker__buttons button { animation: none !important; }
+  .pron-burst { display: none; }
+}

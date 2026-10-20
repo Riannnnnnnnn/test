@@ -91,7 +91,7 @@ try {
   await button('退出全屏').click();
   assert.equal(await page.evaluate(() => Boolean(document.fullscreenElement)), false);
   assert.equal(await page.locator('.course-task-picker button').count(), 23);
-  assert.deepEqual(await page.locator('.course-task-picker__summary span').allTextContents().then((values) => values.map((value) => value.trim().split(/\s+/)[0])), ['读对', '没听清', '错误']);
+  assert.deepEqual(await page.locator('.course-task-picker__summary span').allTextContents().then((values) => values.map((value) => value.trim().split(/\s+/)[0])), ['通过', '错误']);
   assert.equal(await page.locator('.pronunciation-card__question h2').count(), 0);
   await screenshot('布局检查');
   await page.getByRole('button', { name: /^声母 p：苹果/ }).click();
@@ -119,8 +119,9 @@ try {
   assert.equal(await page.locator('.vc-dim').last().locator('.vc-dim__result').textContent(), '!没听清');
   await screenshot('正音-读错与词语匹配');
   await page.goto(`${baseUrl}/report/${page.url().split('/')[4]}`);
-  await page.getByRole('heading', { name: '正音观察' }).waitFor();
+  await page.getByRole('heading', { name: '读音练习建议' }).waitFor();
   assert.equal(await page.locator('.reading-evidence').getByText(/引擎总分|准确度：/).count(), 0);
+  assert.doesNotMatch(await page.locator('.reading-evidence').innerText(), /系统不能确认|已保留本次|智能识别仅供参考/);
   await page.goBack();
   await page.locator('.vc__review-mark').waitFor();
   await page.evaluate(async () => {
@@ -145,7 +146,7 @@ try {
   assert.match(await page.locator('[role="dialog"]').innerText(), /老师星级评价 · 发音清晰度/);
   await button('保存评价').click();
   assert.equal(await page.locator('.course-task-picker button.is-complete').count(), 0);
-  assert.equal(await page.locator('.course-task-picker__summary b').allTextContents().then((values) => values.join(',')), '0,0,0');
+  assert.equal(await page.locator('.course-task-picker__summary b').allTextContents().then((values) => values.join(',')), '0,0');
   assert(await button('已完成教师评价').isVisible());
   assert(await page.evaluate(async () => {
     const db = await import('/src/services/storage/database.ts');
@@ -215,8 +216,8 @@ try {
   const wrongInitial = page.locator('.course-task-picker button.is-wrong');
   await wrongInitial.waitFor();
   assert.match(await wrongInitial.innerText(), /×/);
-  assert.equal(await page.locator('.course-task-picker__summary b').allTextContents().then((values) => values.join(',')), '0,0,1');
-  assert.equal(await page.locator('.course-task-picker__summary').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length), 3);
+  assert.equal(await page.locator('.course-task-picker__summary b').allTextContents().then((values) => values.join(',')), '0,1');
+  assert.equal(await page.locator('.course-task-picker__summary').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length), 2);
   assert.equal(await page.locator('.course-task-picker__buttons').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length), 4);
   await wrongInitial.click();
   await page.getByText('包子', { exact: true }).waitFor();
@@ -318,7 +319,8 @@ try {
           setTimeout(() => this.deliver({ code: 0, data: { status: 2, result: { sn: 0, ws: [{ cw: [{ w: word }] }] } } }), 20);
         } else {
           const issue = kind === 'wrong' ? '<syll content="子"><phone dp_message="0" perr_msg="1"/></syll>' : '';
-          const xml = `<read_word total_score="90" phone_score="90" tone_score="90">${issue}</read_word>`;
+          const score = kind === 'correct' || kind === 'homophone' ? 99 : 90;
+          const xml = `<read_word total_score="${score}" phone_score="${score}" tone_score="${score}">${issue}</read_word>`;
           const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(xml)));
           setTimeout(() => this.deliver({ code: 0, data: { status: 2, data: encoded } }), 30);
         }
@@ -338,7 +340,7 @@ try {
   await popupPage.getByRole('button', { name: '开始智能评测' }).click();
   const resultDialog = popupPage.getByRole('dialog', { name: '读对啦！' });
   await resultDialog.waitFor({ timeout: 12000 });
-  assert.match(await resultDialog.innerText(), /4 \/ 5 星/);
+  assert.match(await resultDialog.innerText(), /5 \/ 5 星/);
   await popupPage.getByText('苹果', { exact: true }).waitFor({ timeout: 5000 });
   await popupPage.getByRole('button', { name: /^声母 g：公鸡/ }).click();
   await popupPage.evaluate(() => { globalThis.fakeSpeechKind = 'homophone'; globalThis.silenceAfter = 450; });
@@ -346,7 +348,7 @@ try {
   await popupPage.locator('.vc--listening').waitFor();
   await popupPage.evaluate(() => { globalThis.testMicrophoneGain.gain.value = .24; setTimeout(() => { globalThis.testMicrophoneGain.gain.value = 0; }, 850); });
   await resultDialog.waitFor({ timeout: 12000 });
-  assert.match(await resultDialog.innerText(), /公鸡.*4 \/ 5 星/s);
+  assert.match(await resultDialog.innerText(), /公鸡.*5 \/ 5 星/s);
   await popupPage.getByRole('button', { name: /^声母 b：包子/ }).click();
   await popupPage.evaluate(() => { globalThis.fakeSpeechKind = 'wrong'; });
   await popupPage.getByRole('button', { name: '重新智能评测' }).click();
@@ -356,6 +358,9 @@ try {
   await wrongDialog.waitFor({ timeout: 12000 });
   assert(await popupPage.getByText('包子', { exact: true }).isVisible());
   await wrongDialog.getByRole('button', { name: '跳过' }).click();
+  const reasonDialog = popupPage.getByRole('dialog', { name: '孩子哪里还可以更好？' });
+  await reasonDialog.getByRole('button', { name: '读错字或没有读' }).click();
+  await reasonDialog.getByRole('button', { name: '确认，下一个字' }).click();
   await popupPage.getByText('苹果', { exact: true }).waitFor();
   await popupPage.getByRole('button', { name: /^声母 b：包子/ }).click();
   await popupPage.evaluate(() => { globalThis.fakeSpeechKind = 'uncertain'; });

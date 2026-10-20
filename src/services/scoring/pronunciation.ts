@@ -38,11 +38,13 @@ export function scorePronunciation(result: XfyunIseResult) {
   // documented pronunciation scores, explicitly labelled as a pronunciation basis.
   const soundBasis = result.pronunciationScore !== undefined && result.toneScore !== undefined
     ? Math.min(result.pronunciationScore, result.toneScore) : undefined;
-  const basis = sentence ? soundBasis ?? result.accuracyScore : soundBasis;
+  // 整句：声韵、声调、准确度、完整度取最弱的一项，漏读/少读不会拿满星。
+  const sentenceScores = [soundBasis, result.accuracyScore, result.integrityScore].filter((value): value is number => value !== undefined);
+  const basis = sentence ? (sentenceScores.length ? Math.min(...sentenceScores) : undefined) : soundBasis;
   const issueKinds = result.issues?.map((issue) => issue.kind) ?? [];
   const pronunciationIssues = issueKinds.filter((kind) => kind.includes("声韵") || kind.includes("声调"));
   // Preserve the engine evidence, but do not present a flagged sound as perfect.
-  const cappedBasis = basis === undefined ? undefined : Math.min(basis, pronunciationIssues.length >= 2 ? 87 : pronunciationIssues.length === 1 ? 97 : 100);
+  const cappedBasis = basis === undefined ? undefined : Math.min(basis, pronunciationIssues.length >= 2 ? 87 : pronunciationIssues.length === 1 || (sentence && issueKinds.some((kind) => alignmentIssues.has(kind))) ? 97 : 100);
   const pronunciationClarity = hasBlockingSpeechReview(result) ? undefined : cappedBasis;
   const scores: Record<string, number> = {};
   if (pronunciationClarity !== undefined) scores.pronunciationClarity = pronunciationClarity;

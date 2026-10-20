@@ -14,8 +14,8 @@
 .guide-visual--blowing img { bottom: 20%; }
 .guide-visual--tiger img { position: absolute; left: 6%; bottom: 18%; max-width: 88%; max-height: 82%; }
 .guide-bubble { position: absolute; right: 6%; top: 14%; max-width: 70%; padding: 14px 24px; border-radius: 30px 30px 30px 6px; background: #fff; color: #3b1a8f; font-size: clamp(26px, 3vw, 40px); font-weight: 900; line-height: 1.25; box-shadow: 0 12px 24px rgba(10, 3, 40, .3); animation: guide-talk 2.4s ease-in-out infinite; transform-origin: 0 100%; }
-.guide-mic { position: relative; width: 160px; height: 160px; display: grid; place-items: center; border-radius: 50%; background: #ff4d6a; box-shadow: 0 9px 0 #b02843; }
-.guide-mic i { position: absolute; inset: 0; border-radius: 50%; border: 3px solid #ff6b81; opacity: 0; animation: guide-ring 2.2s cubic-bezier(.2, .6, .3, 1) infinite; }
+.guide-mic { position: relative; width: 160px; height: 160px; display: grid; place-items: center; border-radius: 50%; background: var(--color-yellow-500); color: var(--color-purple-900); box-shadow: 0 9px 0 #c58a00; }
+.guide-mic i { position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--color-yellow-500); opacity: 0; animation: guide-ring 2.2s cubic-bezier(.2, .6, .3, 1) infinite; }
 .guide-mic i:nth-child(2) { animation-delay: .73s; }.guide-mic i:nth-child(3) { animation-delay: 1.46s; }
 .guide-visual--stars { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .guide-visual--stars svg { opacity: 0; animation: guide-star 2.8s cubic-bezier(.3, 1.8, .5, 1) infinite; }

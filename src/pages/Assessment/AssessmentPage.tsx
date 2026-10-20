@@ -19,6 +19,7 @@ import { useSiteContent } from "@/content/useSiteContent";
 import { AssessmentGuide } from "@/assessment/common/AssessmentGuide/AssessmentGuide";
 import "@/styles/course-assessment.css";
 import "@/styles/pro-assessment.css";
+import "@/styles/motion.css";
 import { upgradeSession } from "@/services/storage/upgradeSession";
 import { assessmentImageUrls, preloadImage, preloadImages } from "@/services/assets/preloadImages";
 

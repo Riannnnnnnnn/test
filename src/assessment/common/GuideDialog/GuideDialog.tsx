@@ -21,7 +21,7 @@ function GuideVisualPane({ step, moduleId }: { step: GuideStep; moduleId: string
     case "mic":
       return <div className="guide-visual guide-visual--mic">
         <span className="guide-mic"><i /><i /><i />
-          <svg viewBox="0 0 24 24" width="72" height="72" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="#fff" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+          <svg viewBox="0 0 24 24" width="72" height="72" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
         </span>
       </div>;
     case "stars":

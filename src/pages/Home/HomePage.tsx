@@ -4,6 +4,7 @@ import { PageContainer, PageHeader } from "@/components/layout";
 import { Button } from "@/components/ui";
 import { useSiteContent } from "@/content/useSiteContent";
 import "@/styles/features.css";
+import "@/styles/motion.css";
 
 export function HomePage() {
   const navigate = useNavigate();

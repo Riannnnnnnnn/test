@@ -145,7 +145,7 @@
 .pron--initials .course-task-picker--initials .course-task-picker__buttons button { width: 100%; min-width: 0; max-width: none; min-height: 49px; padding: 4px; font-size: 19px; }
 .pron--initials .course-task-picker > p { flex-wrap: wrap; }
 .pron--initials .course-task-picker__meter { flex: 1 1 75px; }
-.pron--initials .course-task-picker__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--pro-line); }
+.pron--initials .course-task-picker__summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--pro-line); }
 .pron--initials .course-task-picker__summary span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; min-height: 48px; padding: 4px 2px; border-radius: 10px; background: #e2f5e8; color: #176b3e; font-size: 11px; font-weight: 750; white-space: nowrap; }
 .pron--initials .course-task-picker__summary span.is-uncertain { background: #fff0d6; color: #9b5d08; }
 .pron--initials .course-task-picker__summary span.is-wrong { background: #ffe2e5; color: #a7243c; }
@@ -418,3 +418,19 @@
 @media (prefers-reduced-motion: reduce) {
   .pron__orbit, .pron__art .module-uploaded-image img, .breath__scene::before, .breath__flag { animation: none !important; }
 }
+
+/* 正音：没有满星时的“再试一次 / 跳过”与原因选择 */
+.pron-result--retry { padding: 0 0 6px; }
+.pron-result__star-card--soft { min-width: min(100%, 250px); padding: 12px 20px; }
+.skip-reasons p { margin: 0 0 12px; color: var(--color-purple-900); font-size: 17px; font-weight: 800; }
+.skip-reasons__list { display: grid; gap: 10px; }
+.skip-reasons__item { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 14px; border: 2px solid #ded6f2; border-radius: 16px; background: #fff; text-align: left; cursor: pointer; transition: border-color .18s, background .18s, transform .18s; }
+.skip-reasons__item:hover { border-color: #b79df0; }
+.skip-reasons__item:active { transform: scale(.985); }
+.skip-reasons__item i { flex: 0 0 auto; width: 28px; height: 28px; display: grid; place-items: center; border: 2px solid #c9bfe6; border-radius: 9px; color: #fff; font-style: normal; font-weight: 900; }
+.skip-reasons__item span { display: grid; gap: 2px; }
+.skip-reasons__item b { color: var(--color-purple-900); font-size: 17px; }
+.skip-reasons__item small { color: var(--color-muted); font-size: 13px; font-weight: 700; }
+.skip-reasons__item.is-selected { border-color: #7b45d8; background: #f4edff; }
+.skip-reasons__item.is-selected i { border-color: #7b45d8; background: #7b45d8; }
+.skip-reasons__tip { display: block; margin-top: 10px; color: var(--color-muted); font-size: 14px; font-weight: 700; }
