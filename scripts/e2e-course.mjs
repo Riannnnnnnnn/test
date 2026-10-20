@@ -356,10 +356,25 @@ try {
   await popupPage.evaluate(() => { globalThis.testMicrophoneGain.gain.value = .24; setTimeout(() => { globalThis.testMicrophoneGain.gain.value = 0; }, 850); });
   const wrongDialog = popupPage.getByRole('dialog', { name: '读音可能不对' });
   await wrongDialog.waitFor({ timeout: 12000 });
+  assert.equal(await wrongDialog.locator('.pron-result__stars .rounded-star:not(.is-filled) linearGradient').count(), 5);
+  assert.equal(await wrongDialog.locator('.pron-result__stars .rounded-star.is-filled').count(), 0);
   assert(await popupPage.getByText('包子', { exact: true }).isVisible());
   await wrongDialog.getByRole('button', { name: '跳过' }).click();
   const reasonDialog = popupPage.getByRole('dialog', { name: '孩子哪里还可以更好？' });
-  await reasonDialog.getByRole('button', { name: '读错字或没有读' }).click();
+  assert.equal(await reasonDialog.getByText('其他情况（可选）：').count(), 0);
+  await reasonDialog.getByRole('button', { name: /读成“抛子”/ }).click();
+  const optionLayout = await reasonDialog.locator('.skip-reasons').evaluate((element) => ({
+    horizontalOverflow: element.scrollWidth > element.clientWidth,
+    verticalOverflow: element.scrollHeight > element.clientHeight,
+    optionShadow: getComputedStyle(element.querySelector('.skip-reasons__item.is-selected')).boxShadow,
+    checkmarkAnimation: getComputedStyle(element.querySelector('.skip-reasons__item.is-selected i')).animationName,
+    rippleCount: element.querySelectorAll('.interaction-ripple').length,
+  }));
+  assert.equal(optionLayout.horizontalOverflow, false);
+  assert.equal(optionLayout.verticalOverflow, false);
+  assert.notEqual(optionLayout.optionShadow, 'none');
+  assert.equal(optionLayout.checkmarkAnimation, 'vc-star-pop');
+  assert.equal(optionLayout.rippleCount, 0);
   await reasonDialog.getByRole('button', { name: '确认，下一个字' }).click();
   await popupPage.getByText('苹果', { exact: true }).waitFor();
   await popupPage.getByRole('button', { name: /^声母 b：包子/ }).click();

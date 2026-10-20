@@ -7,6 +7,7 @@ export interface XfyunIseResult {
   emotionScore?: number;
   reviewReasons?: string[];
   issues?: Array<{ text: string; kind: string; position?: string }>;
+  initialConfidenceWarnings?: Array<{ text: string; sound: string; level: number }>;
   category?: string;
   requestParameters?: Record<string, unknown>;
   pronunciationScore?: number;
@@ -140,6 +141,11 @@ export async function classifySpeechContent(result: XfyunIseResult, transcript: 
   // safely score only the final attempt as if the whole recording were correct.
   if (!matched && target && recognized.includes(target)) return "uncertain";
   if (audioIssue) return "uncertain";
+  // A word can receive 100/100 from both forced ISE and dictation even when
+  // its initial consonant is different. An ISE initial confidence of 2 or 3
+  // is not proof of an error, but it is too weak for an automatic five-star pass.
+  if (matched && result.initialConfidenceWarnings?.length
+    && (result.pronunciationScore ?? 0) >= 98 && (result.toneScore ?? 0) >= 98) return "uncertain";
   // A full sentence rarely has a character-perfect dictation. When ISE gives
   // reliable pronunciation/completeness evidence and no alignment error, a
   // partially transcribed sentence (or a failed secondary IAT connection)
@@ -231,6 +237,7 @@ export function parseXfyunIseResult(rawXml: string, sessionId?: string, category
     if (exception && exception !== "0") reviewReasons.push(exceptions[exception] ?? `引擎异常（${exception}），请教师复核`);
   }
   const issues: NonNullable<XfyunIseResult["issues"]> = [];
+  const initialConfidenceWarnings: NonNullable<XfyunIseResult["initialConfidenceWarnings"]> = [];
   for (const node of root.querySelectorAll("syll, phone, word")) {
     const flag = Number(node.getAttribute("dp_message") ?? 0);
     // Prefer the containing syllable/word for duplicate alignment markers.
@@ -244,6 +251,11 @@ export function parseXfyunIseResult(rawXml: string, sessionId?: string, category
       issues.push({ text, kind, position });
     }
     const perr = Number(node.getAttribute("perr_msg") ?? 0);
+    const confidence = Number(node.getAttribute("perr_level_msg") ?? 0);
+    if (node.tagName === "phone" && node.getAttribute("is_yun") === "0" && flag === 0
+      && perr === 0 && (confidence === 2 || confidence === 3)) {
+      initialConfidenceWarnings.push({ text, sound: node.getAttribute("content") ?? "", level: confidence });
+    }
     // Some word results report the sound error on syll rather than phone.
     // Do not duplicate a phone-level error or mistake a copied alignment flag
     // for a pronunciation error.
@@ -270,7 +282,7 @@ export function parseXfyunIseResult(rawXml: string, sessionId?: string, category
     emotionScore: score("emotion_score"),
     fluencyScore: score("fluency_score"),
     integrityScore: score("integrity_score"),
-    issues, reviewReasons: [...new Set(reviewReasons)],
+    issues, initialConfidenceWarnings, reviewReasons: [...new Set(reviewReasons)],
     stars: basis === undefined || reviewReasons.some((reason) => !reason.startsWith("检测到个别字音问题")) ? 0 : Math.ceil(basis / 20),
     sessionId,
     rawXml,
@@ -532,7 +544,10 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
       const onlyRepeatMarkers = repetitionCount > 1 && result.issues?.every((issue) => ["回读", "增读", "声韵错误", "声调错误", "声韵及声调错误"].includes(issue.kind));
       const reviewReasons = (result.reviewReasons ?? []).filter((reason) => !(contentStatus === "matched" && onlyRepeatMarkers && reason.startsWith("检测到错漏读标记")));
       if (contentStatus === "mismatch") reviewReasons.push(`听写结果“${recognized}”与题目不同，评测也检测到发音或错漏读问题，请老师确认。`);
-      else if (contentStatus === "uncertain") reviewReasons.push(recognized ? `听写结果“${recognized}”与评测证据不一致，请重读或请老师确认。` : "听写未返回可靠文字，请重读或请老师确认。");
+      else if (contentStatus === "uncertain" && result.initialConfidenceWarnings?.length && repetitionCount > 0) {
+        const sound = result.initialConfidenceWarnings[0];
+        reviewReasons.push(`“${sound.text}”的声母${sound.sound ? `“${sound.sound}”` : ""}暂时无法确认，请重读或请老师确认。`);
+      } else if (contentStatus === "uncertain") reviewReasons.push(recognized ? `听写结果“${recognized}”与评测证据不一致，请重读或请老师确认。` : "听写未返回可靠文字，请重读或请老师确认。");
       const evaluated = { ...result, transcript, repetitionCount, contentStatus, reviewReasons };
       return { ...evaluated, stars: scorePronunciation(evaluated).stars };
     },

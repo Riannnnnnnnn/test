@@ -45,6 +45,13 @@ try {
     const copiedAlignment = parse('<read_word total_score="100" phone_score="100" tone_score="100"><syll content="苹" dp_message="128" perr_msg="128"/></read_word>');
     check('替换标记复制到音节错误字段不被误作声韵错误', copiedAlignment.issues.length === 1 && copiedAlignment.issues[0].kind === '替换');
     const clearWord = parse('<read_word total_score="96" phone_score="96" tone_score="96"/>');
+    const confidentApple = parse('<read_word total_score="100" phone_score="100" tone_score="100"><syll content="苹"><phone content="p" is_yun="0" perr_msg="0" perr_level_msg="1"/></syll></read_word>');
+    const uncertainApple = parse('<read_word total_score="100" phone_score="100" tone_score="100"><syll content="苹"><phone content="p" is_yun="0" perr_msg="0" perr_level_msg="2"/></syll></read_word>');
+    const confidentStatus = await classifySpeechContent(confidentApple, '苹果', '苹果');
+    const uncertainStatus = await classifySpeechContent(uncertainApple, '苹果', '苹果');
+    check('声母高置信的苹果保留满星', confidentStatus === 'matched' && map({ ...confidentApple, contentStatus: confidentStatus }).stars === 5);
+    check('声母置信不足即使听写和总分满分也不自动放行', uncertainStatus === 'uncertain' && map({ ...uncertainApple, contentStatus: uncertainStatus }).stars === 0);
+    check('声母待复核提示明确且不断言孩子读错', getSpeechReviewFeedback({ ...uncertainApple, contentStatus: uncertainStatus }, '苹果')?.title === '声母需要再确认');
     const wrongWord = parse('<read_word total_score="96" phone_score="96" tone_score="96"><syll content="苹" dp_message="128"/></read_word>');
     check('文字与评测都吻合才确认读对', await classifySpeechContent(clearWord, '苹果', '苹果') === 'matched');
     check('同音字听写不阻断正确读音', await countPronunciationRepetitions('攻击', '公鸡') === 1 && await classifySpeechContent(clearWord, '攻击', '公鸡') === 'matched');

@@ -1,11 +1,11 @@
 import type { PropsWithChildren, ReactNode } from "react";
 
-interface DialogProps { open: boolean; title: string; onClose: () => void; footer?: ReactNode; }
+interface DialogProps { open: boolean; title: string; onClose: () => void; footer?: ReactNode; className?: string; }
 
-export function Dialog({ open, title, onClose, footer, children }: PropsWithChildren<DialogProps>) {
+export function Dialog({ open, title, onClose, footer, className, children }: PropsWithChildren<DialogProps>) {
   if (!open) return null;
   return (
-    <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className={`dialog-backdrop${className ? ` ${className}` : ""}`} role="presentation" onMouseDown={onClose}>
       <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="dialog__head">
           <h2 id="dialog-title">{title}</h2>

@@ -14,8 +14,10 @@ export function getSpeechReviewFeedback(result: XfyunIseResult, referenceText: s
   };
   if (result.contentStatus === "uncertain") return {
     kind: "uncertain",
-    title: result.category === "read_sentence" && result.integrityScore !== undefined && result.integrityScore < 70 ? "句子可能没录完整" : "这次没听清",
-    message: result.reviewReasons?.some((reason) => /音量|噪声|截幅|音频输入|拒评/.test(reason))
+    title: result.initialConfidenceWarnings?.length ? "声母需要再确认" : result.category === "read_sentence" && result.integrityScore !== undefined && result.integrityScore < 70 ? "句子可能没录完整" : "这次没听清",
+    message: result.initialConfidenceWarnings?.length
+      ? `“${result.initialConfidenceWarnings[0].text}”的声母${result.initialConfidenceWarnings[0].sound ? `“${result.initialConfidenceWarnings[0].sound}”` : ""}还不能可靠确认。请再读一次，或请老师听录音确认；这不代表孩子一定读错。`
+      : result.reviewReasons?.some((reason) => /音量|噪声|截幅|音频输入|拒评/.test(reason))
       ? `评测提示：${result.reviewReasons.find((reason) => /音量|噪声|截幅|音频输入|拒评/.test(reason))}。请靠近麦克风再试。`
       : result.category === "read_sentence" && result.integrityScore !== undefined && result.integrityScore < 70
         ? "系统只收到部分句子；请读完整句话，再点麦克风结束。不能据此判定读错。"

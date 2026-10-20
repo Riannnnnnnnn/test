@@ -12,6 +12,8 @@ export function InteractionEffects() {
       // The imported guide owns its button animations and absolute skip layout.
       if (target.closest(".guide")) return;
       playUiClick(target.classList.contains("button--primary") || target.classList.contains("pro-btn--ink") || target.classList.contains("pro-btn--primary"));
+      // The pronunciation choice has its own checkmark and selection feedback; avoid the white click flash.
+      if (target.classList.contains("skip-reasons__item")) return;
       target.querySelectorAll(":scope > .interaction-ripple").forEach((staleRipple) => staleRipple.remove());
       const rect = target.getBoundingClientRect();
       const ripple = document.createElement("span");

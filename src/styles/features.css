@@ -860,3 +860,5 @@
 
 .reading-evidence { padding: 20px; background: #faf7ff; border-radius: 16px; margin: 20px 0; }
 .reading-evidence article { border-top: 1px solid #ded4f1; padding: 10px 0; }
+.reading-evidence--teacher article p { margin: 6px 0 0; line-height: 1.7; }
+.reading-evidence__closing { margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed #cdbff0; color: #45208f; font-weight: 700; line-height: 1.8; }
