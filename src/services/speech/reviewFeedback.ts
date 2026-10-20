@@ -14,8 +14,18 @@ export function getSpeechReviewFeedback(result: XfyunIseResult, referenceText: s
   };
   if (result.contentStatus === "uncertain") return {
     kind: "uncertain",
-    title: "这次没听清",
-    message: "系统不能确认孩子读错了。请靠近麦克风再读一次，或请老师确认。",
+    title: result.category === "read_sentence" && result.integrityScore !== undefined && result.integrityScore < 70 ? "句子可能没录完整" : "这次没听清",
+    message: result.reviewReasons?.some((reason) => /音量|噪声|截幅|音频输入|拒评/.test(reason))
+      ? `评测提示：${result.reviewReasons.find((reason) => /音量|噪声|截幅|音频输入|拒评/.test(reason))}。请靠近麦克风再试。`
+      : result.category === "read_sentence" && result.integrityScore !== undefined && result.integrityScore < 70
+        ? "系统只收到部分句子；请读完整句话，再点麦克风结束。不能据此判定读错。"
+        : result.category === "read_sentence" && result.issues?.some((issue) => ["漏读", "增读", "回读", "替换"].includes(issue.kind))
+          ? "评测检测到错漏读标记，但还不能确认是孩子读错还是录音被截断；请完整重读一次。"
+          : result.category === "read_sentence" && result.transcript?.trim()
+            ? `听写参考：“${result.transcript.trim()}”。听写和发音评测未能相互确认，请重读或请老师确认。`
+            : result.category === "read_sentence"
+              ? "听写没有返回可用文字，发音评测也未达到可靠条件；请完整重读，或请老师确认。"
+              : "系统不能确认孩子读错了。请靠近麦克风再读一次，或请老师确认。",
   };
   if (result.contentStatus === "matched" && result.issues?.some((issue) => issue.kind.includes("声韵") || issue.kind.includes("声调"))) return {
     kind: "pronunciation",
