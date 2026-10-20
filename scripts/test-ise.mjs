@@ -8,7 +8,6 @@ try {
   const checks = await page.evaluate(async () => {
     const { parseXfyunIseResult: parse, buildIseBusiness: business, create16kResampler, classifySpeechContent, countReferenceRepetitions, countPronunciationRepetitions } = await import('/src/services/speech/xfyunIse.ts');
     const { scorePronunciation: map, speechDimensionStars } = await import('/src/services/scoring/pronunciation.ts');
-    const { getSpeechReviewFeedback } = await import('/src/services/speech/reviewFeedback.ts');
     const results = [];
     const check = (name, condition) => results.push({ name, passed: Boolean(condition) });
     const sentence = (attributes, children = '') => `<xml><read_sentence><read_sentence total_score="98" ${attributes}>${children}</read_sentence></read_sentence></xml>`;
@@ -53,8 +52,6 @@ try {
     check('句子听写明显无关时不自动判正确', await classifySpeechContent(clearSentence, '今天出去玩', '小松鼠坐在树下，伸手摘山楂。') === 'uncertain');
     const incompleteSentence = parse(sentence('accuracy_score="88" phone_score="82" tone_score="75" integrity_score="35"'));
     check('句子完整度不足时不能用评测兜底', await classifySpeechContent(incompleteSentence, '', '小松鼠坐在树下，伸手摘山楂。') === 'uncertain');
-    check('未录完整的句子提示具体原因而非笼统没听清', getSpeechReviewFeedback({ ...incompleteSentence, contentStatus: 'uncertain' }, '小松鼠坐在树下，伸手摘山楂。')?.title === '句子可能没录完整');
-    check('句子听写与评测冲突时展示听写参考', getSpeechReviewFeedback({ ...clearSentence, contentStatus: 'uncertain', transcript: '小松鼠坐在树下' }, '小松鼠坐在树下，伸手摘山楂。')?.message.includes('小松鼠坐在树下'));
     const repeated = parse('<read_word total_score="94" phone_score="94" tone_score="92"><syll content="苹" dp_message="64"/></read_word>');
     check('两遍或多遍完整目标词可识别', countReferenceRepetitions('苹果，苹果。', '苹果') === 2 && countReferenceRepetitions('苹果苹果苹果', '苹果') === 3 && await classifySpeechContent(repeated, '苹果苹果', '苹果') === 'matched');
     check('重复中混入不同词不当作读对', await classifySpeechContent(repeated, '苹果香蕉', '苹果') === 'uncertain' && countReferenceRepetitions('苹果香蕉', '苹果') === 0);

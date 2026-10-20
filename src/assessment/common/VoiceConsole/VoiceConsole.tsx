@@ -16,7 +16,6 @@ interface VoiceConsoleProps {
   micLabel: string;
   micAria: string;
   onStart: () => void;
-  onStop?: () => void;
   onPrepare?: () => void;
   dimensions: VoiceDimension[];
   dimensionsAria: string;
@@ -35,7 +34,7 @@ function ReplayIcon() {
   return <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9" /><path d="M20 4.5v4.2h-4.2" /></svg>;
 }
 
-export function VoiceConsole({ state, level, timer, headline, hint, micLabel, micAria, onStart, onStop, onPrepare, dimensions, dimensionsAria, className = "", children }: VoiceConsoleProps) {
+export function VoiceConsole({ state, level, timer, headline, hint, micLabel, micAria, onStart, onPrepare, dimensions, dimensionsAria, className = "", children }: VoiceConsoleProps) {
   const busy = state === "connecting" || state === "processing";
   const listening = state === "listening";
   const mode: WaveMode = listening ? "live" : state === "processing" ? "scan" : state === "done" ? "settled" : "idle";
@@ -45,7 +44,7 @@ export function VoiceConsole({ state, level, timer, headline, hint, micLabel, mi
       <div className="vc__orb-wrap">
         <i className="vc__ripple" aria-hidden="true" /><i className="vc__ripple vc__ripple--2" aria-hidden="true" /><i className="vc__ripple vc__ripple--3" aria-hidden="true" />
         <span className="vc__spin" aria-hidden="true" />
-        <button type="button" className="vc__orb" disabled={busy || (listening && !onStop)} onClick={listening ? onStop : onStart} onPointerEnter={onPrepare} onPointerDown={onPrepare} onFocus={onPrepare} aria-label={micAria} title={micAria}>
+        <button type="button" className="vc__orb" disabled={busy || listening} onClick={onStart} onPointerEnter={onPrepare} onPointerDown={onPrepare} onFocus={onPrepare} aria-label={micAria} title={micAria}>
           {listening ? <span className="vc__eq" aria-hidden="true"><i /><i /><i /><i /></span> : state === "done" ? <ReplayIcon /> : <MicIcon />}
         </button>
       </div>
