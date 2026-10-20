@@ -6,13 +6,13 @@ try {
   const page = await browser.newPage();
   await page.goto(process.env.E2E_BASE_URL || 'http://127.0.0.1:5173');
   const checks = await page.evaluate(async () => {
-    const { parseXfyunIseResult: parse, buildIseBusiness: business, create16kResampler, classifySpeechContent, countReferenceRepetitions } = await import('/src/services/speech/xfyunIse.ts');
+    const { parseXfyunIseResult: parse, buildIseBusiness: business, create16kResampler, classifySpeechContent, countReferenceRepetitions, countPronunciationRepetitions } = await import('/src/services/speech/xfyunIse.ts');
     const { scorePronunciation: map, speechDimensionStars } = await import('/src/services/scoring/pronunciation.ts');
     const results = [];
     const check = (name, condition) => results.push({ name, passed: Boolean(condition) });
     const sentence = (attributes, children = '') => `<xml><read_sentence><read_sentence total_score="98" ${attributes}>${children}</read_sentence></read_sentence></xml>`;
     const low = parse(sentence('accuracy_score="4" phone_score="8" tone_score="0"'));
-    check('百分制4、8、0分不放大', low.accuracyScore === 4 && low.pronunciationScore === 8 && low.toneScore === 0 && map(low).scores.pronunciationClarity === 4);
+    check('句子以声韵和声调较低分为准，不放大低分', low.accuracyScore === 4 && low.pronunciationScore === 8 && low.toneScore === 0 && map(low).scores.pronunciationClarity === 0);
     const local = parse(sentence('', '<sentence accuracy_score="99" fluency_score="99"/>'));
     check('不把子句分数当全文分数', local.accuracyScore === undefined && local.fluencyScore === undefined && !('pronunciationClarity' in map(local).scores));
     for (const [flag, kind] of [[16, '漏读'], [32, '增读'], [64, '回读'], [128, '替换']]) {
@@ -33,18 +33,29 @@ try {
     check('字词局部声调问题保留部分星级且不冒充满分', speechDimensionStars(wordTone, 'pronunciationScore') === 5 && speechDimensionStars(wordTone, 'toneScore') === 4 && map(wordTone).scores.pronunciationClarity === 97 && map(wordTone).stars === 4);
     const clearWord = parse('<read_word total_score="96" phone_score="96" tone_score="96"/>');
     const wrongWord = parse('<read_word total_score="96" phone_score="96" tone_score="96"><syll content="苹" dp_message="128"/></read_word>');
-    check('文字与评测都吻合才确认读对', classifySpeechContent(clearWord, '苹果', '苹果') === 'matched');
-    check('两路证据都指向错读才提示可能读错', classifySpeechContent(wrongWord, '香蕉', '苹果') === 'mismatch');
-    check('只有听写不一致属于没听清', classifySpeechContent(clearWord, '香蕉', '苹果') === 'uncertain');
+    check('文字与评测都吻合才确认读对', await classifySpeechContent(clearWord, '苹果', '苹果') === 'matched');
+    check('同音字听写不阻断正确读音', await countPronunciationRepetitions('攻击', '公鸡') === 1 && await classifySpeechContent(clearWord, '攻击', '公鸡') === 'matched');
+    check('同音字重复朗读仍可识别', await countPronunciationRepetitions('攻击攻击', '公鸡') === 2 && await classifySpeechContent(clearWord, '攻击攻击', '公鸡') === 'matched');
+    check('声调不同不当作同音词', await countPronunciationRepetitions('供给', '公鸡') === 0 && await classifySpeechContent(clearWord, '供给', '公鸡') === 'uncertain');
+    check('同音字但评测指出错漏读不自动判正确', await classifySpeechContent(wrongWord, '攻击', '公鸡') === 'uncertain');
+    check('两路证据都指向错读才提示可能读错', await classifySpeechContent(wrongWord, '香蕉', '苹果') === 'mismatch');
+    check('只有听写不一致属于没听清', await classifySpeechContent(clearWord, '香蕉', '苹果') === 'uncertain');
     const wrongPronunciation = parse('<read_word total_score="84" phone_score="70" tone_score="90"><syll content="子"><phone dp_message="0" perr_msg="1"/></syll></read_word>');
-    check('包纸听写和声韵错误共同指向读错', classifySpeechContent(wrongPronunciation, '包纸', '包子') === 'mismatch');
-    check('仅有声韵错误但听写为空仍不冤枉孩子', classifySpeechContent(wrongPronunciation, '', '包子') === 'uncertain');
-    check('两路证据冲突属于没听清', classifySpeechContent(wrongWord, '苹果', '苹果') === 'uncertain');
-    check('空听写不判孩子读错', classifySpeechContent(clearWord, '', '苹果') === 'uncertain');
+    check('包纸听写和声韵错误共同指向读错', await classifySpeechContent(wrongPronunciation, '包纸', '包子') === 'mismatch');
+    check('仅有声韵错误但听写为空仍不冤枉孩子', await classifySpeechContent(wrongPronunciation, '', '包子') === 'uncertain');
+    check('两路证据冲突属于没听清', await classifySpeechContent(wrongWord, '苹果', '苹果') === 'uncertain');
+    check('空听写不判孩子读错', await classifySpeechContent(clearWord, '', '苹果') === 'uncertain');
+    const clearSentence = parse(sentence('accuracy_score="88" phone_score="82" tone_score="75" integrity_score="91"'));
+    check('句子星级优先依据声韵和声调', map(clearSentence).scores.pronunciationClarity === 75);
+    check('句子少量听写漏字仍使用可靠发音评测', await classifySpeechContent(clearSentence, '小松鼠坐在树下伸手摘山楂', '小松鼠坐在树下，伸手摘山楂。') === 'matched');
+    check('句子听写服务无结果但评测可靠仍保留星级', await classifySpeechContent(clearSentence, '', '小松鼠坐在树下，伸手摘山楂。') === 'matched');
+    check('句子听写明显无关时不自动判正确', await classifySpeechContent(clearSentence, '今天出去玩', '小松鼠坐在树下，伸手摘山楂。') === 'uncertain');
+    const incompleteSentence = parse(sentence('accuracy_score="88" phone_score="82" tone_score="75" integrity_score="35"'));
+    check('句子完整度不足时不能用评测兜底', await classifySpeechContent(incompleteSentence, '', '小松鼠坐在树下，伸手摘山楂。') === 'uncertain');
     const repeated = parse('<read_word total_score="94" phone_score="94" tone_score="92"><syll content="苹" dp_message="64"/></read_word>');
-    check('两遍或多遍完整目标词可识别', countReferenceRepetitions('苹果，苹果。', '苹果') === 2 && countReferenceRepetitions('苹果苹果苹果', '苹果') === 3 && classifySpeechContent(repeated, '苹果苹果', '苹果') === 'matched');
-    check('重复中混入不同词不当作读对', classifySpeechContent(repeated, '苹果香蕉', '苹果') === 'uncertain' && countReferenceRepetitions('苹果香蕉', '苹果') === 0);
-    check('自我纠正不能把整段直接判为正确', classifySpeechContent(wrongWord, '帽子包子', '包子') === 'uncertain');
+    check('两遍或多遍完整目标词可识别', countReferenceRepetitions('苹果，苹果。', '苹果') === 2 && countReferenceRepetitions('苹果苹果苹果', '苹果') === 3 && await classifySpeechContent(repeated, '苹果苹果', '苹果') === 'matched');
+    check('重复中混入不同词不当作读对', await classifySpeechContent(repeated, '苹果香蕉', '苹果') === 'uncertain' && countReferenceRepetitions('苹果香蕉', '苹果') === 0);
+    check('自我纠正不能把整段直接判为正确', await classifySpeechContent(wrongWord, '帽子包子', '包子') === 'uncertain');
     for (const raw of ['<broken>', '<read_sentence total_score="101"/>', '<read_sentence><sentence total_score="90"/></read_sentence>']) {
       let failed = false; try { parse(raw); } catch { failed = true; }
       check(`非法XML/分数/节点拒绝: ${raw}`, failed);

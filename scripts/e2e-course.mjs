@@ -314,7 +314,7 @@ try {
         if (packet.data?.status !== 2) return;
         const kind = globalThis.fakeSpeechKind || 'correct';
         if (this.url.endsWith('/iat')) {
-          const word = kind === 'correct' ? '包子' : kind === 'wrong' ? '包纸' : '流奶';
+          const word = kind === 'homophone' ? '攻击' : kind === 'correct' ? '包子' : kind === 'wrong' ? '包纸' : '流奶';
           setTimeout(() => this.deliver({ code: 0, data: { status: 2, result: { sn: 0, ws: [{ cw: [{ w: word }] }] } } }), 20);
         } else {
           const issue = kind === 'wrong' ? '<syll content="子"><phone dp_message="0" perr_msg="1"/></syll>' : '';
@@ -340,6 +340,13 @@ try {
   await resultDialog.waitFor({ timeout: 12000 });
   assert.match(await resultDialog.innerText(), /4 \/ 5 星/);
   await popupPage.getByText('苹果', { exact: true }).waitFor({ timeout: 5000 });
+  await popupPage.getByRole('button', { name: /^声母 g：公鸡/ }).click();
+  await popupPage.evaluate(() => { globalThis.fakeSpeechKind = 'homophone'; globalThis.silenceAfter = 450; });
+  await popupPage.getByRole('button', { name: '开始智能评测' }).click();
+  await popupPage.locator('.vc--listening').waitFor();
+  await popupPage.evaluate(() => { globalThis.testMicrophoneGain.gain.value = .24; setTimeout(() => { globalThis.testMicrophoneGain.gain.value = 0; }, 850); });
+  await resultDialog.waitFor({ timeout: 12000 });
+  assert.match(await resultDialog.innerText(), /公鸡.*4 \/ 5 星/s);
   await popupPage.getByRole('button', { name: /^声母 b：包子/ }).click();
   await popupPage.evaluate(() => { globalThis.fakeSpeechKind = 'wrong'; });
   await popupPage.getByRole('button', { name: '重新智能评测' }).click();

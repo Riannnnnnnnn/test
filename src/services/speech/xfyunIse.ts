@@ -49,6 +49,10 @@ export function prepareSpeechAuth(): Promise<void> {
   return getSpeechAuth().then(() => undefined);
 }
 
+export function preparePhoneticMatcher(): Promise<void> {
+  return import("./phoneticMatch").then(() => undefined);
+}
+
 export interface XfyunIseSession {
   ready?: Promise<void>;
   stop: () => Promise<XfyunIseResult>;
@@ -62,6 +66,20 @@ const FRAME_BYTES = 1280;
 
 export function normalizeSpeechText(value: string): string {
   return value.normalize("NFKC").replace(/[\s，。！？、,.!?；;：:“”'‘’（）()《》【】—-]/g, "");
+}
+
+function sentenceCoverage(heard: string, target: string): number {
+  if (!heard || !target) return 0;
+  const previous = new Array<number>(target.length + 1).fill(0);
+  for (const character of heard) {
+    let diagonal = 0;
+    for (let index = 1; index <= target.length; index += 1) {
+      const old = previous[index];
+      previous[index] = character === target[index - 1] ? diagonal + 1 : Math.max(previous[index], previous[index - 1]);
+      diagonal = old;
+    }
+  }
+  return previous[target.length] / target.length;
 }
 
 export function matchesReferenceText(transcript: string, referenceText: string): boolean {
@@ -78,10 +96,23 @@ export function countReferenceRepetitions(transcript: string, referenceText: str
   return target.repeat(count) === heard ? count : 0;
 }
 
-export function classifySpeechContent(result: XfyunIseResult, transcript: string, referenceText: string): NonNullable<XfyunIseResult["contentStatus"]> {
+// Dictation chooses written characters from context. For a picture-reading
+// task, an alternative spelling is acceptable evidence only when every
+// syllable AND its tone match the target; ISE still supplies the actual
+// pronunciation score and can veto an alignment/audio problem.
+export async function countPronunciationRepetitions(transcript: string, referenceText: string): Promise<number> {
+  const exact = countReferenceRepetitions(transcript, referenceText);
+  if (exact) return exact;
+  const heard = normalizeSpeechText(transcript);
+  const target = normalizeSpeechText(referenceText);
+  const { countHomophoneRepetitions } = await import("./phoneticMatch");
+  return countHomophoneRepetitions(heard, target);
+}
+
+export async function classifySpeechContent(result: XfyunIseResult, transcript: string, referenceText: string, knownRepetitions?: number): Promise<NonNullable<XfyunIseResult["contentStatus"]>> {
   const recognized = normalizeSpeechText(transcript);
   const target = normalizeSpeechText(referenceText);
-  const repetitionCount = countReferenceRepetitions(transcript, referenceText);
+  const repetitionCount = knownRepetitions ?? await countPronunciationRepetitions(transcript, referenceText);
   const pureRepetition = repetitionCount > 1;
   const alignmentIssue = result.issues?.some((issue) => ["漏读", "增读", "回读", "替换"].includes(issue.kind)
     && !(pureRepetition && ["增读", "回读"].includes(issue.kind)))
@@ -92,7 +123,16 @@ export function classifySpeechContent(result: XfyunIseResult, transcript: string
   // A child may self-correct; without word-level audio segmentation we cannot
   // safely score only the final attempt as if the whole recording were correct.
   if (!matched && target && recognized.includes(target)) return "uncertain";
-  if (audioIssue || !recognized) return "uncertain";
+  if (audioIssue) return "uncertain";
+  // A full sentence rarely has a character-perfect dictation. When ISE gives
+  // reliable pronunciation/completeness evidence and no alignment error, a
+  // partially transcribed sentence (or a failed secondary IAT connection)
+  // must not erase that result. A mostly unrelated transcript still needs review.
+  const reliableSentence = result.category === "read_sentence" && !alignmentIssue
+    && (result.accuracyScore ?? 0) >= 70 && (result.integrityScore ?? 100) >= 70
+    && (result.pronunciationScore ?? 70) >= 40 && (result.toneScore ?? 70) >= 40;
+  if (reliableSentence && (!recognized || sentenceCoverage(recognized, target) >= .65)) return "matched";
+  if (!recognized) return "uncertain";
   // Dictation can hear a different word while ISE marks the actual sound error
   // without emitting a word-alignment flag (for example 包纸 / 包子).
   if (!matched && (alignmentIssue || pronunciationIssue)) return "mismatch";
@@ -461,8 +501,8 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
         new Promise<string>((resolve) => { transcriptTimeout = window.setTimeout(() => resolve(""), 2000); }),
       ]).finally(() => window.clearTimeout(transcriptTimeout));
       const recognized = normalizeSpeechText(transcript);
-      const contentStatus = classifySpeechContent(result, transcript, referenceText);
-      const repetitionCount = countReferenceRepetitions(transcript, referenceText);
+      const repetitionCount = await countPronunciationRepetitions(transcript, referenceText);
+      const contentStatus = await classifySpeechContent(result, transcript, referenceText, repetitionCount);
       const onlyRepeatMarkers = repetitionCount > 1 && result.issues?.every((issue) => ["回读", "增读", "声韵错误", "声调错误", "声韵及声调错误"].includes(issue.kind));
       const reviewReasons = (result.reviewReasons ?? []).filter((reason) => !(contentStatus === "matched" && onlyRepeatMarkers && reason.startsWith("检测到错漏读标记")));
       if (contentStatus === "mismatch") reviewReasons.push(`听写结果“${recognized}”与题目不同，评测也检测到发音或错漏读问题，请老师确认。`);

@@ -36,9 +36,9 @@ export function scorePronunciation(result: XfyunIseResult) {
   const sentence = ["read_sentence", "read_chapter"].includes(result.category ?? "");
   // Word tasks have no documented accuracy_score. Use the weaker of the two
   // documented pronunciation scores, explicitly labelled as a pronunciation basis.
-  const basis = sentence ? result.accuracyScore
-    : result.pronunciationScore !== undefined && result.toneScore !== undefined
-      ? Math.min(result.pronunciationScore, result.toneScore) : undefined;
+  const soundBasis = result.pronunciationScore !== undefined && result.toneScore !== undefined
+    ? Math.min(result.pronunciationScore, result.toneScore) : undefined;
+  const basis = sentence ? soundBasis ?? result.accuracyScore : soundBasis;
   const issueKinds = result.issues?.map((issue) => issue.kind) ?? [];
   const pronunciationIssues = issueKinds.filter((kind) => kind.includes("声韵") || kind.includes("声调"));
   // Preserve the engine evidence, but do not present a flagged sound as perfect.

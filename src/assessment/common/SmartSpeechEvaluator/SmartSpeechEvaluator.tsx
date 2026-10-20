@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { VoiceConsole, type VoiceDimension } from "@/assessment/common/VoiceConsole/VoiceConsole";
 import { warmMicrophone } from "@/services/audio/microphone";
-import { SmartEvaluationUnavailableError, SpeechContentMismatchError, matchesReferenceText, prepareSpeechAuth, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
+import { SmartEvaluationUnavailableError, SpeechContentMismatchError, matchesReferenceText, preparePhoneticMatcher, prepareSpeechAuth, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
 import { hasBlockingSpeechReview, speechDimensionStars, strictPronunciationStars } from "@/services/scoring/pronunciation";
 import { getSpeechReviewFeedback } from "@/services/speech/reviewFeedback";
 
@@ -73,7 +73,7 @@ export const SmartSpeechEvaluator = forwardRef<SmartSpeechEvaluatorHandle, Smart
   };
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; listening.current = false; window.clearTimeout(maximumTimer.current); window.clearTimeout(noSpeechTimer.current); session.current?.cancel(); }; }, []);
-  useEffect(() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }, [referenceText]);
+  useEffect(() => { void prepareSpeechAuth().catch(() => undefined); void preparePhoneticMatcher().catch(() => undefined); void warmMicrophone(); }, [referenceText]);
   useEffect(() => {
     if (evidence || initialScore !== undefined || initialPreview || state !== "done") return;
     setState("idle");
