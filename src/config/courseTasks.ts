@@ -31,10 +31,10 @@ export const largePronunciationTasks: CourseTask[] = [
 ];
 
 export const smallExpressionTasks: CourseTask[] = [
-  { id: "A5-happy", projectId: "A5", title: "开心", text: "笑一笑，做出开心的表情。", image: "/assets/v3/emotions/boy-happy.webp", imageFemale: "/assets/v3/emotions/girl-happy.webp", prompt: "看看图片，模仿开心的表情，可以配上自己的动作。" },
-  { id: "A5-sad", projectId: "A5", title: "难过", text: "嘴角向下，做出难过的表情。", image: "/assets/v3/emotions/boy-sad.webp", imageFemale: "/assets/v3/emotions/girl-sad.webp", prompt: "看看图片，模仿难过的表情，可以配上自己的动作。" },
-  { id: "A5-shy", projectId: "A5", title: "害羞", text: "低低头，做出害羞的表情。", image: "/assets/v3/emotions/boy-shy.webp", imageFemale: "/assets/v3/emotions/girl-shy.webp", prompt: "看看图片，模仿害羞的表情，可以配上自己的动作。" },
-  { id: "A5-angry", projectId: "A5", title: "生气", text: "皱皱眉，做出生气的表情。", image: "/assets/v3/emotions/boy-angry.webp", imageFemale: "/assets/v3/emotions/girl-angry.webp", prompt: "看看图片，模仿生气的表情，可以配上自己的动作。" },
+  { id: "A5-happy", projectId: "A5", title: "开心", text: "笑一笑，做出开心的表情。", image: "/assets/v3/emotions/boy-happy-half.webp", imageFemale: "/assets/v3/emotions/girl-happy-half.webp", prompt: "看看图片，模仿开心的表情，可以配上自己的动作。" },
+  { id: "A5-sad", projectId: "A5", title: "难过", text: "嘴角向下，做出难过的表情。", image: "/assets/v3/emotions/boy-sad-half.webp", imageFemale: "/assets/v3/emotions/girl-sad-half.webp", prompt: "看看图片，模仿难过的表情，可以配上自己的动作。" },
+  { id: "A5-shy", projectId: "A5", title: "害羞", text: "低低头，做出害羞的表情。", image: "/assets/v3/emotions/boy-shy-half.webp", imageFemale: "/assets/v3/emotions/girl-shy-half.webp", prompt: "看看图片，模仿害羞的表情，可以配上自己的动作。" },
+  { id: "A5-angry", projectId: "A5", title: "生气", text: "皱皱眉，做出生气的表情。", image: "/assets/v3/emotions/boy-angry-half.webp", imageFemale: "/assets/v3/emotions/girl-angry-half.webp", prompt: "看看图片，模仿生气的表情，可以配上自己的动作。" },
 ];
 
 export function getCourseTaskImage(task: Pick<CourseTask, "image" | "imageFemale">, gender?: string): string | undefined {

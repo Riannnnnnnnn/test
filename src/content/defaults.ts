@@ -24,6 +24,6 @@ export const defaultSiteContent: SiteContent = {
       { key: "flower", connector: "最后", title: "开出小花", symbol: "花", imageUrl: "/assets/v2/questions/a3-flower-v3.webp" },
     ] },
     A4: { menuTitle: "情境反应", summary: "理解场景并自然回答", eyebrow: "A4 · 情境反应", title: "认识新朋友", prompt: "今天班里来了一位新朋友，你想认识他，你会怎么说？", teacherNote: "", imageUrl: "/assets/v2/questions/a4-new-friend-v3.webp", imageAlt: "挥手问好的中国小朋友", visualText: "新", secondaryText: "“你好，我叫……”" },
-    A5: { menuTitle: "表情模仿表现", summary: "模仿开心、难过、害羞和生气", eyebrow: "A5 · 表情模仿表现", title: "一起来做表情", prompt: "请看着图片，依次模仿开心、难过、害羞和生气的表情。", teacherNote: "", imageUrl: "/assets/v3/emotions/boy-happy.webp", imageAlt: "开心的卡通男孩", visualText: "开心", secondaryText: "" },
+    A5: { menuTitle: "表情模仿表现", summary: "模仿开心、难过、害羞和生气", eyebrow: "A5 · 表情模仿表现", title: "一起来做表情", prompt: "请看着图片，依次模仿开心、难过、害羞和生气的表情。", teacherNote: "", imageUrl: "/assets/v3/emotions/boy-happy-half.webp", imageAlt: "开心的卡通男孩", visualText: "开心", secondaryText: "" },
   },
 };

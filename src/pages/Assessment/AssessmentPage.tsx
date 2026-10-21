@@ -20,6 +20,7 @@ import { AssessmentGuide } from "@/assessment/common/AssessmentGuide/AssessmentG
 import "@/styles/course-assessment.css";
 import "@/styles/pro-assessment.css";
 import "@/styles/motion.css";
+import "@/styles/expression.css";
 import { upgradeSession } from "@/services/storage/upgradeSession";
 import { assessmentImageUrls, preloadImage, preloadImages } from "@/services/assets/preloadImages";
 
@@ -185,7 +186,7 @@ export function AssessmentPage() {
         {fullscreenError && <p className="assessment-image-error" role="alert">{fullscreenError}</p>}
         <div className="assessment-layout">
           <AssessmentHeader studentName={student?.name ?? "学生"} stage={activeSession.stage} moduleId={moduleId} current={index + 1} total={modules.length} />
-          <section className="assessment-stage">{ActiveModule ? <ActiveModule studentGrade={student?.grade} studentGender={student?.gender} key={`${moduleId}-${selectedTask?.id ?? "legacy"}-${attemptRevision}`} stage={activeSession.courseVersion === 3 ? activeSession.stage : undefined} items={activeResult.items} onSelectItem={selectItem} result={displayResult} onResultChange={updateResult} onRecorded={handleRecorded} /> : <Card><h2>模块准备中</h2><p>该模块已完成配置，交互将在后续阶段开放。</p></Card>}</section>
+          <section className="assessment-stage">{ActiveModule ? <ActiveModule studentGrade={student?.grade} studentGender={student?.gender} key={`${moduleId}-${moduleId === "A5" ? "expressions" : selectedTask?.id ?? "legacy"}-${attemptRevision}`} stage={activeSession.courseVersion === 3 ? activeSession.stage : undefined} items={activeResult.items} onSelectItem={selectItem} result={displayResult} onResultChange={updateResult} onRecorded={handleRecorded} /> : <Card><h2>模块准备中</h2><p>该模块已完成配置，交互将在后续阶段开放。</p></Card>}</section>
           {imageError && <p className="assessment-image-error" role="alert">{imageError}</p>}
           <AssessmentFooter canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(activeResult.teacherScores && Object.keys(activeResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? displayResult.autoScores?.breathAndVoice : displayResult.autoScores?.pronunciationClarity} showIntelligentRating={false} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
         </div>

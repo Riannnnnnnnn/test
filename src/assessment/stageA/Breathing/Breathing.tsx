@@ -161,7 +161,7 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
       <div className="breath__cue" aria-hidden="true"><span>{module.visualText}</span></div>
       <div className="breath__track">
         <div className="breath__rail"><span className="breath__trail" /></div>
-        {[3, 6, 9].map((second) => <span className="breath__mark" key={second} style={{ "--k": second / 12 } as CSSProperties}><i />{second}s</span>)}
+        {[3, 6, 9].map((second) => <span className={`breath__mark ${progress >= second / 12 ? "is-passed" : ""}`} key={second} style={{ "--k": second / 12 } as CSSProperties}><i />{second}s</span>)}
         <span className={`breath__train ${module.imageUrl ? "has-image" : ""} ${volume > .08 ? "is-moving" : ""}`}>{module.imageUrl ? <><img src={module.imageUrl} alt={module.imageAlt} /><span className="breath__speed" aria-hidden="true"><i /><i /><i /></span><span className="train-smoke train-smoke--one" aria-hidden="true" /><span className="train-smoke train-smoke--two" aria-hidden="true" /><span className="train-smoke train-smoke--three" aria-hidden="true" /></> : <><i />{module.visualText}</>}</span>
         <span className={`breath__goal ${progress >= 1 ? "is-reached" : ""}`} aria-label={module.secondaryText}><span className="breath__flag">{module.secondaryText}</span><span className="breath__pole" aria-hidden="true" /></span>
       </div>

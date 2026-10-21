@@ -9,7 +9,8 @@ function cloneDefaults(): SiteContent {
 }
 
 function webpBuiltInImage(url?: string): string | undefined {
-  return url?.replace(/^(\/assets\/.*)\.png$/i, "$1.webp");
+  return url?.replace(/^(\/assets\/.*)\.png$/i, "$1.webp")
+    .replace(/^(\/assets\/v3\/emotions\/(?:boy|girl)-(?:happy|sad|shy|angry))\.webp$/i, "$1-half.webp");
 }
 
 function normalizeContent(saved: SiteContent): SiteContent {
@@ -44,7 +45,7 @@ function normalizeContent(saved: SiteContent): SiteContent {
         A1: ["/assets/v2/questions/a1-apple.webp"],
         A2: ["/assets/v2/questions/a2-train.webp", "/assets/v2/questions/a2-train-v2.webp"],
         A4: ["/assets/v2/questions/a4-new-friend.webp", "/assets/v2/questions/a4-new-friend-v2.webp"],
-        A5: ["/assets/v2/questions/a5-tiger.webp", "/assets/v2/questions/a5-tiger-v3.webp"],
+        A5: ["/assets/v2/questions/a5-tiger.webp", "/assets/v2/questions/a5-tiger-v3.webp", ...["boy", "girl"].flatMap((person) => ["happy", "sad", "shy", "angry"].map((mood) => `/assets/v3/emotions/${person}-${mood}.webp`))],
       };
       const legacyDefaultImageUrl = legacyDefaultImageUrls[id as keyof SiteContent["modules"]];
       if (!customized?.imageUrl || legacyDefaultImageUrl?.includes(merged.imageUrl)) merged.imageUrl = module.imageUrl;

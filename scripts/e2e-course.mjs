@@ -190,12 +190,21 @@ try {
   await happyGuidePicture.evaluate((img) => img.decode());
   await screenshot('表现力说明-表情模仿');
   await skip();
-  assert.equal(await page.locator('.course-task-picker button').count(), 4);
-  for (const [name, emotion] of [['开心', 'happy'], ['难过', 'sad'], ['害羞', 'shy'], ['生气', 'angry']]) {
+  assert.equal(await page.locator('.expr__mood').count(), 4);
+  assert.match(await page.locator('.expr__figure').getAttribute('src'), /girl-happy-half\.webp$/);
+  await button('开始跟做表情').click();
+  assert(await page.getByText('3 秒后开始，准备好', { exact: true }).isVisible());
+  assert(await button('下一个表情').isDisabled());
+  await page.getByText('跟做完成，请老师评价', { exact: true }).waitFor({ timeout: 12000 });
+  assert.equal(await page.locator('.expr__mood.is-done').count(), 1);
+  await button('下一个表情').click();
+  assert.equal(await page.locator('.expr__mood.is-done').count(), 1);
+  for (const [name, emotion] of [['难过', 'sad'], ['害羞', 'shy'], ['生气', 'angry']]) {
     await button(name).click();
-    const picture = page.locator('.course-expression__stimulus img');
-    assert.match(await picture.getAttribute('src'), new RegExp(`girl-${emotion}\\.webp$`));
+    const picture = page.locator('.expr__figure');
+    assert.match(await picture.getAttribute('src'), new RegExp(`girl-${emotion}-half\\.webp$`));
     await picture.evaluate((img) => img.decode());
+    assert.equal(await page.locator('.expr__mood.is-done').count(), 1);
   }
   await button('教师星级评价').click(); await button('保存评价').click();
   await screenshot('表现力');
@@ -249,7 +258,7 @@ try {
   assert(await page.locator('.course-sentence').isVisible());
   await screenshot('大阶段正音');
   await page.goto(baseUrl + '/assessment/test-large/A5'); await skip();
-  assert(await page.getByRole('heading', { name: '森林广播员' }).isVisible());
+  assert.equal(await page.locator('.expr__word--scenario').innerText(), '森林广播员');
   await page.setViewportSize({ width: 390, height: 844 });
   await button('评测说明').click(); await screenshot('手机说明'); await skip();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));

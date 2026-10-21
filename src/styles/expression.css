@@ -1,0 +1,142 @@
+/* ==========================================================================
+   表情模仿（A5）· 与正音 / 气息同一套“浅色舞台 + 深靛控制台”语言
+   每种表情有自己的主题色和一个会动的小角色；只动 transform / opacity。
+   ========================================================================== */
+.card.expr { --mood: #ffb81f; --mood-soft: #fff1bd; --mood-deep: #8a5200; --held: 0; grid-template-columns: minmax(200px, 250px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+.expr__picker { grid-column: 1; grid-row: 1 / 3; min-width: 0; display: grid; align-content: start; gap: 12px; padding: 14px; border: 1px solid var(--pro-line); border-radius: 18px; background: #faf8ff; }
+.expr__moods { display: grid; gap: 10px; }
+.expr__mood {
+  position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr) 22px; align-items: center; gap: 12px; min-height: 66px; padding: 7px 12px 7px 8px;
+  border: 1px solid var(--pro-line); border-radius: 16px; background: #fff; color: var(--pro-ink); font: inherit; text-align: left; cursor: pointer;
+  transition: transform .25s var(--m-spring, var(--pro-spring)), border-color .2s, background .2s, box-shadow .25s var(--pro-ease);
+}
+.expr__mood:hover { transform: translateX(4px); border-color: var(--mood); }
+.expr__mood:active { transform: scale(.97); transition-duration: .08s; }
+.expr__mood:focus-visible { outline: 3px solid rgba(255, 212, 76, .85); outline-offset: 2px; }
+.expr__thumb { width: 52px; height: 52px; display: block; overflow: hidden; border-radius: 50%; background: var(--mood-soft); box-shadow: inset 0 0 0 2px #fff, 0 0 0 2px var(--mood); }
+.expr__thumb img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: 50% 14%; transform: scale(1.35); transform-origin: 50% 22%; }
+.expr__mood b { font-size: 20px; letter-spacing: .12em; }
+.expr__mood i { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: transparent; color: #fff; font-size: 13px; font-style: normal; font-weight: 900; }
+.expr__mood.is-done i { background: #2fbf85; animation: vc-star-pop .5s var(--pro-spring) both; }
+.expr__mood.is-selected { border-color: transparent; background: linear-gradient(135deg, var(--mood-soft), #fff 85%); box-shadow: 0 0 0 2px var(--mood), 0 10px 22px color-mix(in srgb, var(--mood) 28%, transparent); transform: translateX(6px); }
+.expr__mood.is-selected b { color: var(--mood-deep); }
+
+/* ---------- 舞台 ---------- */
+.expr__stage {
+  grid-column: 2; grid-row: 1; position: relative; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: center; gap: clamp(16px, 3vw, 44px);
+  padding: clamp(12px, 2vh, 22px) clamp(18px, 3vw, 44px); overflow: hidden; border: 1px solid var(--pro-line); border-radius: 20px;
+  background: radial-gradient(70% 90% at 14% 50%, color-mix(in srgb, var(--mood) 24%, transparent), transparent 62%), radial-gradient(60% 80% at 100% 0%, rgba(122, 79, 214, .1), transparent 60%), linear-gradient(135deg, #faf7ff, #fffdf6);
+  animation: pro-swap .5s var(--pro-ease) both;
+}
+.expr__portrait {
+  position: relative; justify-self: center; align-self: stretch; width: min(100%, 100vh); max-height: 100%; aspect-ratio: 640 / 470; min-height: 0; margin: auto 0; overflow: hidden; isolation: isolate; border-radius: 26px;
+  background: radial-gradient(circle at 50% 30%, #fff 0 20%, var(--mood-soft) 68%, color-mix(in srgb, var(--mood) 38%, #fff) 100%);
+  box-shadow: 0 18px 36px color-mix(in srgb, var(--mood) 26%, transparent), inset 0 0 0 1px rgba(255, 255, 255, .8);
+  animation: expr-pop .65s var(--m-spring, var(--pro-spring)) both;
+}
+.expr__figure { position: absolute; z-index: 2; left: 0; bottom: 0; width: 100%; height: 100%; display: block; object-fit: contain; object-position: 50% 100%; transform-origin: 50% 100%; filter: drop-shadow(0 10px 12px rgba(62, 25, 140, .18)); }
+.expr__glow { position: absolute; z-index: 0; left: 50%; top: 42%; width: 70%; aspect-ratio: 1; margin: -35% 0 0 -35%; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, .9), transparent 68%); animation: expr-glow 3.6s ease-in-out infinite alternate; }
+.expr__ring { position: absolute; z-index: 4; inset: 0; width: 100%; height: 100%; fill: none; pointer-events: none; }
+.expr__ring rect { stroke: var(--mood); stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 0 6px var(--mood)); opacity: 0; transition: stroke-dashoffset .12s linear, opacity .3s; }
+.expr.is-holding .expr__ring rect, .expr.is-done .expr__ring rect { opacity: 1; }
+.expr.is-done .expr__ring rect { stroke: #2fbf85; filter: drop-shadow(0 0 6px #2fbf85); }
+
+/* 每种表情有自己的“待机动作” */
+.expr--happy .expr__figure { animation: expr-bounce 1.5s ease-in-out infinite; }
+.expr--sad .expr__figure { animation: expr-sink 3.4s ease-in-out infinite; }
+.expr--shy .expr__figure { animation: expr-sway 3.2s ease-in-out infinite; }
+.expr--angry .expr__figure { animation: expr-shake 2.6s ease-in-out infinite; }
+.expr.is-holding .expr__figure { animation-duration: .9s; }
+.expr.is-done .expr__figure { animation: expr-cheer .8s var(--m-spring, var(--pro-spring)) both; }
+
+/* 氛围小粒子：开心=星星上浮，难过=雨滴下落，害羞=爱心飘升，生气=气团冒起 */
+.expr__fx { position: absolute; z-index: 1; inset: 0; pointer-events: none; }
+.expr__fx i { position: absolute; left: var(--l); width: 18px; height: 18px; opacity: 0; transform: scale(var(--s)); animation: var(--fx-anim, expr-rise) var(--t) var(--d) linear infinite; }
+.expr--happy .expr__fx i { bottom: -6%; background: #ffc928; clip-path: polygon(50% 0, 62% 36%, 98% 38%, 69% 59%, 80% 96%, 50% 74%, 20% 96%, 31% 59%, 2% 38%, 38% 36%); width: 22px; height: 22px; }
+.expr--shy .expr__fx i { bottom: -6%; background: #ff7ab6; clip-path: path("M9 16 C-6 6 2 -3 9 3 C16 -3 24 6 9 16Z"); width: 18px; height: 16px; }
+.expr--sad .expr__fx { --fx-anim: expr-drop; }
+.expr--sad .expr__fx i { top: -8%; width: 10px; height: 14px; border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%; background: linear-gradient(180deg, #bcd3ff, #6d98f2); }
+.expr--angry .expr__fx i { bottom: 4%; width: 24px; height: 24px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 150, 120, .75), rgba(255, 106, 77, .1) 70%); animation-name: expr-puff; }
+
+/* ---------- 文案 ---------- */
+.expr__copy { min-width: 0; display: grid; justify-items: center; align-content: center; gap: clamp(8px, 1.6vh, 16px); text-align: center; }
+.expr__tag em { padding: 0 8px 0 10px; }
+.expr__word { display: inline-flex; font-size: clamp(56px, 7.6vw, 120px); line-height: 1.12; letter-spacing: .1em; font-weight: 800; color: var(--mood-deep); filter: drop-shadow(0 8px 14px color-mix(in srgb, var(--mood) 36%, transparent)); }
+.expr__word span { display: inline-block; transform-origin: 50% 80%; animation: m-char-in .62s calc(.14s + var(--i, 0) * .09s) var(--m-spring, var(--pro-spring)) both; }
+.expr__text { max-width: 14em; margin: 0; color: var(--pro-ink-2); font-size: clamp(18px, 2vw, 30px); line-height: 1.7; font-weight: 700; animation: pro-rise .5s .3s var(--pro-ease) both; }
+.expr__count { position: absolute; z-index: 5; inset: 0; display: grid; place-items: center; color: #fff; font-size: clamp(90px, 16vh, 170px); font-weight: 900; text-shadow: 0 6px 0 var(--mood), 0 12px 30px rgba(36, 16, 72, .35); background: rgba(36, 16, 72, .28); backdrop-filter: blur(2px); animation: expr-count .95s var(--pro-ease) both; }
+.expr__burst { position: absolute; z-index: 6; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.expr__burst i { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--c); opacity: 0; animation: m-burst .95s calc(.05s + var(--d, 0s)) var(--m-ease, var(--pro-ease)) both; }
+.expr__burst i:nth-child(3n) { width: 8px; height: 14px; border-radius: 2px; }
+
+/* ---------- 控制台（复用 .vc 外观，换成两列） ---------- */
+.expr__console { grid-column: 2; grid-row: 2; grid-template-columns: 108px minmax(0, 1fr) auto; }
+.expr__orb-num { font-size: 32px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.vc--done.expr__console .expr__orb { background: radial-gradient(circle at 32% 22%, #b8f5d4, #2fbf85 52%, #15926a); color: #fff; }
+.expr__scope { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); align-items: end; gap: 6px; height: clamp(40px, 7vh, 60px); padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .09); border-radius: 14px; background: linear-gradient(180deg, rgba(8, 3, 28, .6), rgba(8, 3, 28, .36)); box-shadow: inset 0 2px 14px rgba(0, 0, 0, .4); }
+.expr__scope i { height: 100%; border-radius: 5px; background: rgba(255, 255, 255, .12); transform-origin: 50% 100%; transition: background .2s, box-shadow .2s, transform .3s var(--pro-spring); }
+.expr__scope i.is-on { background: linear-gradient(180deg, #ffe784, #ffb91f); box-shadow: 0 0 10px rgba(255, 212, 76, .7); transform: scaleY(1.04); }
+.vc--done .expr__scope i.is-on { background: linear-gradient(180deg, #8ef0b6, #2fbf85); box-shadow: 0 0 10px rgba(88, 224, 160, .6); animation: expr-wave .7s ease-in-out both; }
+.vc--done .expr__scope i:nth-child(2) { animation-delay: .05s; } .vc--done .expr__scope i:nth-child(3) { animation-delay: .1s; } .vc--done .expr__scope i:nth-child(4) { animation-delay: .15s; } .vc--done .expr__scope i:nth-child(5) { animation-delay: .2s; }
+.vc--done .expr__scope i:nth-child(6) { animation-delay: .25s; } .vc--done .expr__scope i:nth-child(7) { animation-delay: .3s; } .vc--done .expr__scope i:nth-child(8) { animation-delay: .35s; } .vc--done .expr__scope i:nth-child(9) { animation-delay: .4s; } .vc--done .expr__scope i:nth-child(10) { animation-delay: .45s; }
+.expr__next:not(:disabled) { animation: expr-nudge 1.8s 1.2s ease-in-out infinite; }
+
+/* ---------- 大阶段：森林广播员 ---------- */
+.card.expr--scenario { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.expr__stage--scenario { grid-column: 1; grid-template-columns: minmax(0, 1fr); text-align: center; background: radial-gradient(70% 90% at 15% 0%, rgba(125, 227, 255, .22), transparent 60%), radial-gradient(60% 80% at 95% 10%, rgba(255, 212, 76, .22), transparent 60%), linear-gradient(135deg, #f4f0ff, #fffdf6); }
+.expr__word--scenario { font-size: clamp(44px, 6vw, 92px); color: #3f1a8c; letter-spacing: .08em; }
+.expr__text--scenario { max-width: 22em; font-size: clamp(20px, 2.4vw, 36px); }
+.expr__rain { position: absolute; inset: 0; pointer-events: none; overflow: hidden; animation: expr-rain-stop 14s ease-in-out infinite; }
+.expr__rain i { position: absolute; top: -10%; left: var(--l); width: 3px; height: 26px; border-radius: 3px; background: linear-gradient(180deg, transparent, #7fb0ff); opacity: 0; animation: expr-fall var(--t) var(--d) linear infinite; }
+.expr__sun { position: absolute; right: 7%; top: 9%; width: clamp(60px, 9vw, 120px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff4b8, #ffc928 60%, #ff9e2b); box-shadow: 0 0 0 14px rgba(255, 212, 76, .16), 0 0 50px rgba(255, 185, 31, .5); animation: expr-sun 14s ease-in-out infinite; }
+
+/* ---------- 动画 ---------- */
+@keyframes expr-pop { from { opacity: 0; transform: translateY(16px) scale(.86) rotate(-2deg); } to { opacity: 1; transform: none; } }
+@keyframes expr-glow { from { opacity: .55; transform: scale(.94); } to { opacity: 1; transform: scale(1.06); } }
+@keyframes expr-bounce { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-9px) rotate(1.2deg); } }
+@keyframes expr-sink { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(7px) scale(.985); } }
+@keyframes expr-sway { 0%, 100% { transform: rotate(-1.8deg); } 50% { transform: rotate(1.8deg) translateY(-3px); } }
+@keyframes expr-shake { 0%, 70%, 100% { transform: translateX(0); } 76% { transform: translateX(-6px) rotate(-.8deg); } 82% { transform: translateX(6px) rotate(.8deg); } 88% { transform: translateX(-4px); } 94% { transform: translateX(3px); } }
+@keyframes expr-cheer { 0% { transform: scale(1); } 40% { transform: scale(1.07) translateY(-8px); } 100% { transform: scale(1); } }
+@keyframes expr-rise { 0% { opacity: 0; transform: translate3d(0, 0, 0) scale(var(--s)); } 15% { opacity: .9; } 100% { opacity: 0; transform: translate3d(calc(var(--w) * 22px), -300px, 0) scale(var(--s)) rotate(calc(var(--w) * 40deg)); } }
+@keyframes expr-drop { 0% { opacity: 0; transform: translateY(0) scale(var(--s)); } 15% { opacity: .85; } 100% { opacity: 0; transform: translateY(330px) scale(var(--s)); } }
+@keyframes expr-puff { 0% { opacity: 0; transform: translate3d(0, 0, 0) scale(.4); } 25% { opacity: .9; } 100% { opacity: 0; transform: translate3d(calc(var(--w) * 16px), -220px, 0) scale(1.8); } }
+@keyframes expr-count { 0% { opacity: 0; transform: scale(1.6); } 25% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(.85); } }
+@keyframes expr-wave { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.45); } }
+@keyframes expr-nudge { 0%, 70%, 100% { transform: none; } 85% { transform: scale(1.06); } }
+@keyframes expr-fall { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: .8; } 100% { opacity: 0; transform: translateY(110vh); } }
+@keyframes expr-rain-stop { 0%, 55% { opacity: 1; } 65%, 90% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes expr-sun { 0%, 50% { opacity: .25; transform: scale(.8); } 70%, 90% { opacity: 1; transform: scale(1.05); } 100% { opacity: .25; transform: scale(.8); } }
+
+@media (max-width: 900px) {
+  .card.expr { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; height: auto; }
+  .expr__picker, .expr__stage, .expr__console { grid-column: 1; grid-row: auto; }
+  .expr__moods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .expr__stage { grid-template-columns: minmax(0, 1fr); }
+  .expr__console { grid-template-columns: 90px minmax(0, 1fr); }
+  .expr__next { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .expr *, .expr__portrait, .expr__stage { animation: none !important; }
+  .expr__fx, .expr__burst { display: none; }
+}
+
+/* 左侧小标题：不换行，进度条占满第二行 */
+.expr__picker .course-task-picker > p { flex-wrap: wrap; row-gap: 8px; }
+.expr__picker .course-task-picker__title { white-space: nowrap; }
+.expr__picker .course-task-picker > p small { white-space: nowrap; }
+.expr__picker .course-task-picker__meter { order: 3; flex: 1 0 100%; }
+
+/* ---------- 正音：题图周围的星点 + 单字呼吸光 ---------- */
+.pron__sparkles { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.pron__sparkles i { position: absolute; left: var(--x); top: var(--y); width: 16px; height: 16px; background: #ffc928; opacity: 0; transform: scale(var(--s)); clip-path: polygon(50% 0, 62% 36%, 98% 38%, 69% 59%, 80% 96%, 50% 74%, 20% 96%, 31% 59%, 2% 38%, 38% 36%); animation: pron-twinkle 3.6s var(--d) ease-in-out infinite; }
+@keyframes pron-twinkle { 0%, 100% { opacity: 0; transform: scale(calc(var(--s) * .4)) rotate(0); } 50% { opacity: .85; transform: scale(var(--s)) rotate(40deg); } }
+.pron__halo { animation: m-halo .8s .05s var(--m-ease) both, expr-glow 4s .9s ease-in-out infinite alternate; }
+
+/* ---------- 气息：经过刻度时亮起并弹一下 ---------- */
+.breath__mark { transition: color .3s; }
+.breath__mark i { transition: background .3s, height .3s var(--pro-spring); }
+.breath__mark.is-passed { color: #ffe27a; animation: breath-mark-pop .55s var(--pro-spring) both; }
+.breath__mark.is-passed i { height: 14px; background: #ffd44c; box-shadow: 0 0 10px rgba(255, 212, 76, .85); }
+@keyframes breath-mark-pop { 0% { transform: translateX(-50%) scale(.7); } 60% { transform: translateX(-50%) scale(1.3); } 100% { transform: translateX(-50%) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .pron__sparkles, .breath__mark.is-passed { animation: none !important; } .pron__sparkles { display: none; } }

@@ -44,7 +44,7 @@ export const moduleGuides: Record<string, ModuleGuide> = {
   A5: { steps: [
     prepare,
     { title: "认识四种表情", body: "看看开心、难过、害羞和生气时，眉毛、眼睛和嘴巴有什么变化。", visual: "image" },
-    { title: "跟着图片做表情", body: "请孩子依次模仿四种表情，可以配上自然的动作。", visual: "happy" },
+    { title: "跟着图片做表情", body: "点击“开始跟做”，倒计时 3 秒后模仿图片里的表情，保持 5 秒。完成后继续下一种表情。", visual: "happy" },
     { ...rate, body: "老师依次观察孩子模仿开心、难过、害羞、生气时的表情变化与动作表现，再为四种表情的整体表现选择星级。本项不需要录音。" },
   ] },
 };

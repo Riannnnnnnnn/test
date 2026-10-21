@@ -19,6 +19,9 @@ const BURST = Array.from({ length: 14 }, (_, index) => {
   return { "--x": `${Math.round(Math.cos(angle) * radius)}px`, "--y": `${Math.round(Math.sin(angle) * radius * .8)}px`, "--c": BURST_COLORS[index % BURST_COLORS.length], "--d": `${(index % 4) * 0.04}s`, "--r": `${index % 2 ? 220 : -220}deg` } as CSSProperties;
 });
 
+/** 题图周围缓缓闪烁的小星点（位置固定，避免重渲染时跳动）。 */
+const SPARKLES = Array.from({ length: 9 }, (_, index) => ({ "--x": `${(index * 41 + 8) % 86 + 6}%`, "--y": `${(index * 29 + 12) % 78 + 8}%`, "--d": `${(index % 5) * -.8}s`, "--s": `${.6 + (index % 3) * .3}` } as CSSProperties));
+
 export function Pronunciation({ onResultChange, result, stage, studentGrade, items, onSelectItem }: AssessmentModuleProps) {
   const [feedback, setFeedback] = useState<{ kind: "full" | "wrong" | "uncertain" | "sound-review" | "partial"; stars: number; nextId?: string; detail?: string }>();
   const [reasonStep, setReasonStep] = useState(false);
@@ -91,7 +94,7 @@ export function Pronunciation({ onResultChange, result, stage, studentGrade, ite
       {selected ? <TaskPicker tasks={tasks} selectedId={selected.id} items={items} onSelect={onSelectItem} initials={stage === "A"} /> : <><p className="eyebrow">{module.eyebrow}</p><h2>{module.title}</h2><p>{module.prompt}</p></>}
     </div>
     <div className="pron__stage">
-      {stage !== "B" && <div className="pron__art" key={`art-${selected?.id ?? "legacy"}`}><span className="pron__halo" aria-hidden="true" /><span className="pron__orbit" aria-hidden="true" />{picture}</div>}
+      {stage !== "B" && <div className="pron__art" key={`art-${selected?.id ?? "legacy"}`}><span className="pron__halo" aria-hidden="true" /><span className="pron__orbit" aria-hidden="true" /><span className="pron__sparkles" aria-hidden="true">{SPARKLES.map((item, index) => <i key={index} style={item} />)}</span>{picture}</div>}
       <div className="pron__word" aria-label={word} key={`word-${selected?.id ?? "legacy"}`}>
         {selected && <span className="pron__tag">{initialLabel ? <><em>目标声母</em><b>{initialLabel}</b></> : <em>{selected.title}</em>}</span>}
         {selected ? <strong className={stage === "B" ? "course-sentence" : "course-word"}>{word}</strong> : <div className="pronunciation-card__syllables">
