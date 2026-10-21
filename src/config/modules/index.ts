@@ -10,7 +10,7 @@ export const moduleDefinitions: Record<string, ModuleDefinition> = {
   A2: { id: "A2", title: "基础气息", summary: "持续发声让小火车前进", rendererKey: "breathing" },
   A3: { id: "A3", title: "三图顺序表达", summary: "排序后完整讲述", rendererKey: "picture-sequence" },
   A4: { id: "A4", title: "情境反应", summary: "理解场景并自然回答", rendererKey: "scenario-response" },
-  A5: { id: "A5", title: "小动物模仿表现", summary: "用声音、动作和表情表现", rendererKey: "animal-imitation" },
+  A5: { id: "A5", title: "表情模仿表现", summary: "模仿开心、难过、害羞和生气", rendererKey: "animal-imitation" },
   B1: { id: "B1", title: "语音准确度", summary: "词语、短语与短句", rendererKey: "planned" },
   B2: { id: "B2", title: "复杂单图看图说话", summary: "观察并组织信息", rendererKey: "planned" },
   B3: { id: "B3", title: "故事复述", summary: "听后重新讲述", rendererKey: "planned" },

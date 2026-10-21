@@ -9,6 +9,10 @@ function GuideVisualPane({ step, moduleId }: { step: GuideStep; moduleId: string
   const { content } = useSiteContent();
   const module = moduleId in content.modules ? content.modules[moduleId as keyof typeof content.modules] : undefined;
   switch (step.visual) {
+    case "happy":
+      return <div className="guide-visual guide-visual--happy">
+        <img className="guide-float" src="/assets/v3/emotions/guide-happy-expression.webp" alt="开心地微笑并指向笑脸的卡通男孩" />
+      </div>;
     case "listen":
       return <div className={`guide-visual guide-visual--listen ${moduleId === "A2" ? "guide-visual--blowing" : ""}`}>
         <img className="guide-float" src={moduleId === "A2" ? "/assets/v2/star-mascot-guide-blowing-mic-natural.webp" : "/assets/v2/star-mascot-hero-assessment.webp"} alt="" />

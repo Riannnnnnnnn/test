@@ -40,9 +40,9 @@ export function StageIntroPage() {
   }, [searchParams, setStudent, student]);
 
   useEffect(() => {
-    const urls = config.moduleIds.flatMap((id) => assessmentImageUrls(stage, id, content));
+    const urls = config.moduleIds.flatMap((id) => assessmentImageUrls(stage, id, content, student?.gender));
     void preloadImage(urls[0]).then(() => preloadImages(urls.slice(1)));
-  }, [config.moduleIds, content, stage]);
+  }, [config.moduleIds, content, stage, student?.gender]);
 
   useEffect(() => {
     if (!microphoneDialogOpen) return;
@@ -62,7 +62,7 @@ export function StageIntroPage() {
     if (!student || config.availability !== "available" || !microphonePassed) return;
     setStarting(true);
     setImageError("");
-    const firstImage = assessmentImageUrls(stage, config.moduleIds[0], content)[0];
+    const firstImage = assessmentImageUrls(stage, config.moduleIds[0], content, student.gender)[0];
     if (!(await preloadImage(firstImage))) {
       setImageError("题目图片暂时没有加载好，请检查网络后再试一次。");
       setStarting(false);
@@ -89,7 +89,7 @@ export function StageIntroPage() {
           <h1>{config.name}</h1><p className="intro-card__lead">{config.description}</p>
           <div className="ability-chips">{config.tagline.map((item) => <span key={item}>{item}</span>)}</div>
           <div className="module-list">
-            {config.moduleIds.map((id, index) => { const editable = id in content.modules ? content.modules[id as keyof typeof content.modules] : undefined; return <div className="module-list__item" key={id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{({ A1: "正音", A2: "气息", A5: "表现力" } as Record<string, string>)[id] ?? editable?.menuTitle ?? moduleDefinitions[id].title}</strong><p>{id === "A1" ? stage === "A" ? "23 个声母 · 看图读词" : "平翘舌与 d、t、n、l 句子朗读" : id === "A5" ? stage === "A" ? "小老虎、小狗、小鸭模仿" : "森林广播员情境表演" : editable?.summary ?? moduleDefinitions[id].summary}</p></div></div>; })}
+            {config.moduleIds.map((id, index) => { const editable = id in content.modules ? content.modules[id as keyof typeof content.modules] : undefined; return <div className="module-list__item" key={id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{({ A1: "正音", A2: "气息", A5: "表现力" } as Record<string, string>)[id] ?? editable?.menuTitle ?? moduleDefinitions[id].title}</strong><p>{id === "A1" ? stage === "A" ? "23 个声母 · 看图读词" : "平翘舌与 d、t、n、l 句子朗读" : id === "A5" ? stage === "A" ? "开心、难过、害羞、生气四种表情模仿" : "森林广播员情境表演" : editable?.summary ?? moduleDefinitions[id].summary}</p></div></div>; })}
           </div>
           <div className="intro-card__footer">
             <div><strong>{config.moduleIds.length} 个评测项目</strong><p>{config.availability === "available" ? "点击开始后，先在弹窗中测试麦克风" : "模块定义已经建立，完整交互将在后续阶段开放"}</p></div>

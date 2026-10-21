@@ -184,11 +184,19 @@ try {
   console.log('PASS 小火车停声和到达终点自动结算');
   await button('下一项').click();
   await button('下一步 →').click();
-  assert.match(await page.locator('.guide-visual--tiger img').getAttribute('src'), /star-mascot-guide-tiger\.webp$/);
-  await screenshot('表现力说明-小老虎动作');
+  await page.getByText('跟着图片做表情', { exact: true }).waitFor();
+  const happyGuidePicture = page.locator('.guide-visual--happy img');
+  assert.match(await happyGuidePicture.getAttribute('src'), /guide-happy-expression\.webp$/);
+  await happyGuidePicture.evaluate((img) => img.decode());
+  await screenshot('表现力说明-表情模仿');
   await skip();
-  assert.equal(await page.locator('.course-task-picker button').count(), 3);
-  await button('小狗').click();
+  assert.equal(await page.locator('.course-task-picker button').count(), 4);
+  for (const [name, emotion] of [['开心', 'happy'], ['难过', 'sad'], ['害羞', 'shy'], ['生气', 'angry']]) {
+    await button(name).click();
+    const picture = page.locator('.course-expression__stimulus img');
+    assert.match(await picture.getAttribute('src'), new RegExp(`girl-${emotion}\\.webp$`));
+    await picture.evaluate((img) => img.decode());
+  }
   await button('教师星级评价').click(); await button('保存评价').click();
   await screenshot('表现力');
   await button('完成评测').click();
@@ -197,7 +205,7 @@ try {
   const url = await page.locator('.report-qr-panel__code').getAttribute('data-share-url');
   await page.goto(url); await page.locator('.ability-observations').waitFor();
   assert.equal(await page.locator('.ability-observations > div').count(), 3);
-  console.log('PASS 三个动物、三项报告、扫码报告');
+  console.log('PASS 四种表情、女孩图片切换、三项报告、扫码报告');
   await page.goto(`${baseUrl}/assessment/${sessionId}/A1`);
   await page.evaluate(async () => {
     const db = await import('/src/services/storage/database.ts');
@@ -362,7 +370,13 @@ try {
   await wrongDialog.getByRole('button', { name: '跳过' }).click();
   const reasonDialog = popupPage.getByRole('dialog', { name: '孩子哪里还可以更好？' });
   assert.equal(await reasonDialog.getByText('其他情况（可选）：').count(), 0);
-  await reasonDialog.getByRole('button', { name: /读成“抛子”/ }).click();
+  assert.match(await reasonDialog.innerText(), /“包子”哪些发音还可以练习？可多选/);
+  assert.deepEqual(await reasonDialog.locator('.skip-reasons__item').allTextContents(), ['双唇无力', '口型偏散', '双唇闭合不充分', '有待提升']);
+  await reasonDialog.getByRole('button', { name: '双唇无力' }).click();
+  await reasonDialog.getByRole('button', { name: '口型偏散' }).click();
+  await reasonDialog.getByRole('button', { name: '双唇闭合不充分' }).click();
+  await reasonDialog.getByRole('button', { name: '有待提升' }).click();
+  assert.equal(await reasonDialog.locator('.skip-reasons__item[aria-pressed="true"]').count(), 4);
   const optionLayout = await reasonDialog.locator('.skip-reasons').evaluate((element) => ({
     horizontalOverflow: element.scrollWidth > element.clientWidth,
     verticalOverflow: element.scrollHeight > element.clientHeight,

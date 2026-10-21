@@ -20,7 +20,7 @@ function normalizeContent(saved: SiteContent): SiteContent {
     ...defaults,
     ...saved,
     taskOverrides: saved.taskOverrides && Object.fromEntries(Object.entries(saved.taskOverrides).map(([id, override]) =>
-      [id, { ...override, image: webpBuiltInImage(override.image) }])),
+      [id, { ...override, ...(override.image !== undefined ? { image: webpBuiltInImage(override.image) } : {}), ...(override.imageFemale !== undefined ? { imageFemale: webpBuiltInImage(override.imageFemale) } : {}) }])),
     brand: {
       ...defaults.brand,
       ...saved.brand,
@@ -44,7 +44,7 @@ function normalizeContent(saved: SiteContent): SiteContent {
         A1: ["/assets/v2/questions/a1-apple.webp"],
         A2: ["/assets/v2/questions/a2-train.webp", "/assets/v2/questions/a2-train-v2.webp"],
         A4: ["/assets/v2/questions/a4-new-friend.webp", "/assets/v2/questions/a4-new-friend-v2.webp"],
-        A5: ["/assets/v2/questions/a5-tiger.webp"],
+        A5: ["/assets/v2/questions/a5-tiger.webp", "/assets/v2/questions/a5-tiger-v3.webp"],
       };
       const legacyDefaultImageUrl = legacyDefaultImageUrls[id as keyof SiteContent["modules"]];
       if (!customized?.imageUrl || legacyDefaultImageUrl?.includes(merged.imageUrl)) merged.imageUrl = module.imageUrl;
@@ -52,6 +52,16 @@ function normalizeContent(saved: SiteContent): SiteContent {
       if (id === "A3" && customized?.teacherNote === "拖动图片或使用箭头调整顺序，排好后开始讲述。") merged.teacherNote = "";
       if (id === "A4" && customized?.teacherNote === "孩子理解场景后直接回答，不提供标准答案。") merged.teacherNote = "";
       if (id === "A5" && customized?.teacherNote === "请老师重点观察孩子是否愿意大胆表现，完成后填写老师评分。") merged.teacherNote = "";
+      if (id === "A5") {
+        const oldDefaults: Partial<SiteContent["modules"]["A5"]> = {
+          menuTitle: "小动物模仿表现", summary: "用声音、动作和表情表现", eyebrow: "A5 · 小动物模仿表现",
+          title: "神气的小老虎", prompt: "请用声音、动作和表情，模仿一只神气的小老虎。",
+          imageAlt: "披着斗篷的神气卡通小老虎", visualText: "小老虎",
+        };
+        for (const key of Object.keys(oldDefaults) as Array<keyof typeof oldDefaults>) {
+          if (key !== "sequenceItems" && merged[key] === oldDefaults[key]) merged[key] = module[key];
+        }
+      }
       if (module.sequenceItems) merged.sequenceItems = module.sequenceItems.map((item, index) => {
         const customizedItem = customized?.sequenceItems?.[index];
         const legacyDefaultSequenceImageUrls = [

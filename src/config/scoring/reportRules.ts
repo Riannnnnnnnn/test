@@ -14,7 +14,7 @@ const trainingAdvice: Record<(typeof stageAReportDimensions)[number], string> = 
   breathAndVoice: "每天做 3 轮“小火车呜——”练习，每轮保持声音平稳，记录最长持续时间。",
   logicalOrganization: "用三张生活照片练习“先—然后—最后”，每次说清动作和结果。",
   situationalResponse: "每天模拟一个问候、请求或解释场景，让孩子先听懂问题，再用完整句回答。",
-  performance: "选择一种喜欢的动物，用声音、动作、表情完成 20 秒模仿，家长只给予具体肯定。",
+  performance: "对着镜子练习开心、难过、害羞和生气的表情，观察眉毛、眼睛和嘴巴的变化，再配上自然的动作。",
   languageExpression: "每天选一件刚发生的小事，用“人物—做了什么—结果怎样”连续说 30 秒。",
 };
 

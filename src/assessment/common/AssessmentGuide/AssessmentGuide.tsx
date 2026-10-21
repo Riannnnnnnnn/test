@@ -20,15 +20,15 @@ function stepsFor(moduleId: string, large: boolean) {
     { title: "表现不同的情绪", body: "先用着急的语气提醒动物躲雨，再用开心的语气宣布雨停。鼓励孩子配合表情和动作，完整演出来。" },
     { title: "老师观察并评星", body: "本项由老师观察语言、声音、表情和动作后评分，不需要录音。点击“教师星级评价”，保存后点击“完成评测”查看报告。" },
   ] : [
-    { title: "选择动物朋友", body: "依次选择小老虎、小狗和小鸭。三种动物的声音和动作不同，鼓励孩子大胆模仿。" },
-    { title: "声音、动作、表情一起表现", body: "让孩子看着动物图片模仿叫声，并配合身体动作和表情。需要提醒时，可以参考图片旁的叫声。" },
-    { title: "观察整体表现", body: "让孩子依次模仿动物，老师观察所有题目后点击一次“教师星级评价”，记录表现力的整体表现。不需要逐只动物评分，也不需要录音。" },
+    { title: "认识四种表情", body: "依次选择开心、难过、害羞和生气。让孩子看看人物的眉毛、眼睛和嘴巴有什么变化。" },
+    { title: "跟着图片做表情", body: "让孩子模仿图片里的表情，也可以配上自己的动作。鼓励孩子大胆表现，不要求说固定的话。" },
+    { title: "评价四种表情", body: "孩子依次模仿开心、难过、害羞、生气后，老师观察表情变化和动作表现，点击一次“教师星级评价”记录整体表现。本项不需要录音。" },
   ];
   return [{ title: "完成当前任务", body: "观察题目内容，让孩子完成任务后，使用底部教师星级评价记录表现，再点击下一项。" }];
 }
 
 export function AssessmentGuide({ moduleId, large, onDismiss }: { moduleId: string; large: boolean; onDismiss: () => void }) {
-  const steps: GuideStep[] = stepsFor(moduleId, large).map((step, index, all) => ({ ...step, visual: index === all.length - 1 ? "stars" : index === 0 ? "mascot" : moduleId === "A5" ? !large && index === 1 ? "tiger" : "listen" : "mic", ...(moduleId === "A2" && index === 1 ? { visual: "listen", bubble: "呜——" } : {}) }));
+  const steps: GuideStep[] = stepsFor(moduleId, large).map((step, index, all) => ({ ...step, visual: index === all.length - 1 ? "stars" : index === 0 ? "mascot" : moduleId === "A5" ? large ? "listen" : "happy" : "mic", ...(moduleId === "A2" && index === 1 ? { visual: "listen", bubble: "呜——" } : {}) }));
   const title = moduleId === "A1" ? "正音评测" : moduleId === "A2" ? "气息评测" : "表现力评测";
   return <GuideDialog moduleId={moduleId} moduleLabel={`${large ? "大阶段" : "小阶段"} · ${title}`} steps={steps} onClose={onDismiss} />;
 }

@@ -1,4 +1,4 @@
-export type GuideVisual = "mascot" | "listen" | "tiger" | "mic" | "stars" | "image" | "sequence";
+export type GuideVisual = "mascot" | "listen" | "happy" | "tiger" | "mic" | "stars" | "image" | "sequence";
 
 export interface GuideStep {
   title: string;
@@ -43,8 +43,8 @@ export const moduleGuides: Record<string, ModuleGuide> = {
   ] },
   A5: { steps: [
     prepare,
-    { title: "请孩子看小老虎", body: "屏幕上有一只神气的小老虎，请孩子看一看它的样子。", visual: "image" },
-    { title: "声音、动作、表情", body: "请孩子用声音、动作和表情，模仿这只小老虎。", visual: "listen", bubble: "吼——" },
-    { ...rate, body: "老师看声音、动作和表情是否投入，再选择星级。" },
+    { title: "认识四种表情", body: "看看开心、难过、害羞和生气时，眉毛、眼睛和嘴巴有什么变化。", visual: "image" },
+    { title: "跟着图片做表情", body: "请孩子依次模仿四种表情，可以配上自然的动作。", visual: "happy" },
+    { ...rate, body: "老师依次观察孩子模仿开心、难过、害羞、生气时的表情变化与动作表现，再为四种表情的整体表现选择星级。本项不需要录音。" },
   ] },
 };

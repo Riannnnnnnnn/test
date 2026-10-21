@@ -11,7 +11,7 @@ import { moduleDefinitions } from "@/config/modules";
 import { getStageAQuestion } from "@/data/questionBank";
 import type { AudioRecording } from "@/services/audio";
 import { averageScoreRecords, mergeFinalScores } from "@/services/scoring";
-import { getCourseTasks } from "@/config/courseTasks";
+import { getCourseTasks, getCourseTaskImage } from "@/config/courseTasks";
 import type { AssessmentResult } from "@/types";
 import { getSession, getStudent, saveAudio, saveSession } from "@/services/storage";
 import { useAssessmentStore } from "@/stores/assessmentStore";
@@ -48,7 +48,7 @@ export function AssessmentPage() {
         const upgraded = upgradeSession(found);
         setSession(upgraded);
         if (upgraded !== found) await saveSession(upgraded);
-        if (!student) { const owner = await getStudent(found.studentId); if (owner) setStudent(owner); }
+        if (student?.id !== found.studentId) { const owner = await getStudent(found.studentId); if (owner) setStudent(owner); }
       }
       setLoading(false);
     });
@@ -58,8 +58,8 @@ export function AssessmentPage() {
     if (!assessmentStage) return;
     const ids = assessmentVersion === 3 ? stageConfigs[assessmentStage].moduleIds : [moduleId];
     const current = Math.max(0, ids.indexOf(moduleId));
-    void preloadImages(ids.slice(current, current + 2).flatMap((id) => assessmentImageUrls(assessmentStage, id, content)));
-  }, [assessmentVersion, assessmentStage, moduleId, content]);
+    void preloadImages(ids.slice(current, current + 2).flatMap((id) => assessmentImageUrls(assessmentStage, id, content, student?.gender)));
+  }, [assessmentVersion, assessmentStage, moduleId, content, student?.gender]);
 
   useEffect(() => {
     const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -106,7 +106,7 @@ export function AssessmentPage() {
   async function selectItem(id: string) {
     const target = tasks.find((task) => task.id === id);
     if (!target) return;
-    if (!(await preloadImage(content.taskOverrides?.[target.id]?.image ?? target.image))) {
+    if (!(await preloadImage(getCourseTaskImage({ ...target, ...content.taskOverrides?.[target.id] }, student?.gender)))) {
       setImageError("图片暂时没有加载好，请检查网络后再点一次。");
       return;
     }
@@ -185,7 +185,7 @@ export function AssessmentPage() {
         {fullscreenError && <p className="assessment-image-error" role="alert">{fullscreenError}</p>}
         <div className="assessment-layout">
           <AssessmentHeader studentName={student?.name ?? "学生"} stage={activeSession.stage} moduleId={moduleId} current={index + 1} total={modules.length} />
-          <section className="assessment-stage">{ActiveModule ? <ActiveModule studentGrade={student?.grade} key={`${moduleId}-${selectedTask?.id ?? "legacy"}-${attemptRevision}`} stage={activeSession.courseVersion === 3 ? activeSession.stage : undefined} items={activeResult.items} onSelectItem={selectItem} result={displayResult} onResultChange={updateResult} onRecorded={handleRecorded} /> : <Card><h2>模块准备中</h2><p>该模块已完成配置，交互将在后续阶段开放。</p></Card>}</section>
+          <section className="assessment-stage">{ActiveModule ? <ActiveModule studentGrade={student?.grade} studentGender={student?.gender} key={`${moduleId}-${selectedTask?.id ?? "legacy"}-${attemptRevision}`} stage={activeSession.courseVersion === 3 ? activeSession.stage : undefined} items={activeResult.items} onSelectItem={selectItem} result={displayResult} onResultChange={updateResult} onRecorded={handleRecorded} /> : <Card><h2>模块准备中</h2><p>该模块已完成配置，交互将在后续阶段开放。</p></Card>}</section>
           {imageError && <p className="assessment-image-error" role="alert">{imageError}</p>}
           <AssessmentFooter canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(activeResult.teacherScores && Object.keys(activeResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? displayResult.autoScores?.breathAndVoice : displayResult.autoScores?.pronunciationClarity} showIntelligentRating={false} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
         </div>

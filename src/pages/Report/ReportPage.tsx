@@ -102,7 +102,7 @@ export function ReportPage() {
   // 老师在“跳过”时勾选的具体读音问题：直接使用评测话术，并在报告结语中汇总。
   const teacherIssues = a1Items.map((item) => ({ questionId: item.questionId, word: String(item.rawResult?.referenceText ?? getCourseTask(item.questionId)?.text ?? item.questionId), issues: (item.rawResult?.skipIssues as TeacherIssue[] | undefined) ?? [] })).filter((item) => item.issues.length);
   const teacherIssueIds = new Set(teacherIssues.map((item) => item.questionId));
-  const closingParts = teacherIssues.flatMap((item) => item.issues.map((issue) => /^B1-/.test(item.questionId) ? `句子朗读（${issue.pattern}）` : `“${item.word}”读成“${issue.reading}”（${issue.pattern}）`));
+  const closingParts = teacherIssues.flatMap((item) => item.issues.map((issue) => /^B1-/.test(item.questionId) ? `句子朗读（${issue.pattern}）` : issue.pattern ? `“${item.word}”读成“${issue.reading}”（${issue.pattern}）` : `“${item.word}”：${issue.reading}`));
   const readingEvidence = a1Items
     .filter((result) => !teacherIssueIds.has(result.questionId) && result.rawResult?.scoringVersion === "ise-evidence-v2" && (result.rawResult?.evidence as XfyunIseResult | undefined)?.reviewReasons?.length);
   const reportDimensions = session?.courseVersion === 3 ? stageAReportDimensions.filter((id) => ["pronunciationClarity", "breathAndVoice", "performance"].includes(id)) : stageAReportDimensions;

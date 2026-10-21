@@ -2,20 +2,21 @@ import { ModuleShell } from "@/assessment/common/ModuleShell/ModuleShell";
 import { useSiteContent } from "@/content/useSiteContent";
 import { Card } from "@/components/ui";
 import type { AssessmentModuleProps } from "@/assessment/types";
-import { getCourseTasks } from "@/config/courseTasks";
+import { getCourseTasks, getCourseTaskImage } from "@/config/courseTasks";
 import { TaskPicker } from "@/assessment/common/TaskPicker/TaskPicker";
 
-export function AnimalImitation({ stage, result, items, onSelectItem }: AssessmentModuleProps) {
+export function AnimalImitation({ stage, studentGender, result, items, onSelectItem }: AssessmentModuleProps) {
   const { content } = useSiteContent();
   const module = content.modules.A5;
   const tasks = stage ? getCourseTasks(stage, "A5") : [];
   const task = tasks.find((item) => item.id === result.questionId);
   if (task) {
     const selected = { ...task, ...content.taskOverrides?.[task.id] };
+    const image = getCourseTaskImage(selected, studentGender);
     return <Card className="module-card course-expression">
       {tasks.length > 1 && <TaskPicker tasks={tasks} selectedId={selected.id} items={items} onSelect={onSelectItem} />}
-      <div className={`course-expression__stimulus ${stage === "B" ? "course-expression__stimulus--scenario" : ""}`}>
-        {selected.image && <img src={selected.image} alt={selected.title} />}
+      <div className={`course-expression__stimulus ${stage === "B" ? "course-expression__stimulus--scenario" : "course-expression__stimulus--emotion"}`}>
+        {image && <img src={image} alt={`${studentGender === "female" ? "女孩" : "男孩"}${selected.title}的表情`} />}
         <div><h2>{selected.title}</h2><p>{selected.text}</p></div>
       </div>
     </Card>;

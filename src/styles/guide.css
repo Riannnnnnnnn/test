@@ -11,6 +11,7 @@
 .guide-visual__picture { max-width: 70%; max-height: 70%; }
 .guide-float { animation: guide-float 3.2s ease-in-out infinite; }
 .guide-visual--listen img { position: absolute; left: 6%; bottom: 15%; max-width: 78%; max-height: 74%; }
+.guide-visual--happy img { position: absolute; left: 6%; bottom: 12%; max-width: 88%; max-height: 80%; }
 .guide-visual--blowing img { bottom: 20%; }
 .guide-visual--tiger img { position: absolute; left: 6%; bottom: 18%; max-width: 88%; max-height: 82%; }
 .guide-bubble { position: absolute; right: 6%; top: 14%; max-width: 70%; padding: 14px 24px; border-radius: 30px 30px 30px 6px; background: #fff; color: #3b1a8f; font-size: clamp(26px, 3vw, 40px); font-weight: 900; line-height: 1.25; box-shadow: 0 12px 24px rgba(10, 3, 40, .3); animation: guide-talk 2.4s ease-in-out infinite; transform-origin: 0 100%; }
@@ -46,5 +47,5 @@
 @keyframes guide-talk { 50% { transform: scale(1.08); } }
 @keyframes guide-ring { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(2); opacity: 0; } }
 @keyframes guide-star { 0%, 10% { transform: scale(0); opacity: 0; } 25% { transform: scale(1.5) rotate(12deg); opacity: 1; } 35%, 88% { transform: scale(1); opacity: 1; } 100% { opacity: 0; } }
-@media (max-width: 760px) { .guide { grid-template-columns: 1fr; grid-template-rows: 200px minmax(0, 1fr); height: min(640px, 100%); } .guide__body { padding: 24px 24px 22px; } .guide-visual--blowing img { bottom: 17%; } .guide-visual--tiger img { bottom: 16%; } }
+@media (max-width: 760px) { .guide { grid-template-columns: 1fr; grid-template-rows: 200px minmax(0, 1fr); height: min(640px, 100%); } .guide__body { padding: 24px 24px 22px; } .guide-visual--blowing img { bottom: 17%; } .guide-visual--happy img { bottom: 10%; max-height: 85%; } .guide-visual--tiger img { bottom: 16%; } }
 @media (prefers-reduced-motion: reduce) { .guide-backdrop, .guide, .guide__text, .guide__art-inner, .guide-float, .guide-bubble, .guide-visual--sequence span { animation: none; } .guide-visual--stars svg { animation: none; opacity: 1; } .guide-mic i { animation: none; } }

@@ -22,7 +22,7 @@ const BURST = Array.from({ length: 14 }, (_, index) => {
 export function Pronunciation({ onResultChange, result, stage, studentGrade, items, onSelectItem }: AssessmentModuleProps) {
   const [feedback, setFeedback] = useState<{ kind: "full" | "wrong" | "uncertain" | "sound-review" | "partial"; stars: number; nextId?: string; detail?: string }>();
   const [reasonStep, setReasonStep] = useState(false);
-  /** 老师勾选的具体读音问题（来自评测话术库）；ISSUE_ACCURATE_ID 表示“本项准确”。 */
+  /** 老师勾选的发音问题；大阶段另支持“本项准确”。 */
   const [issueIds, setIssueIds] = useState<string[]>([]);
   const evaluatorRef = useRef<SmartSpeechEvaluatorHandle>(null);
   const advanceTimer = useRef(0);
@@ -108,12 +108,12 @@ export function Pronunciation({ onResultChange, result, stage, studentGrade, ite
         : feedback?.kind === "full"
           ? <Button onClick={() => void advanceTo(feedback.nextId)}>{feedback.nextId ? (stage === "B" ? "立即下一句" : "立即下一个字") : "完成本题"}</Button>
           : <><Button variant="secondary" onClick={retryFromFeedback}>再试一次</Button><Button onClick={() => { setIssueIds([]); setReasonStep(true); }}>跳过</Button></>}</div>}>
-      {reasonStep ? <div className="skip-reasons">
-        {issueSet && <><p>{stage === "B" ? "孩子这句读得怎么样？请老师勾选：" : `孩子是怎么读“${issueSet.word}”的？请老师勾选：`}</p>
-          <div className="skip-reasons__list" role="group" aria-label="孩子的实际读法">{issueSet.options.map((item) => <button type="button" key={item.id} className={`skip-reasons__item ${issueIds.includes(item.id) ? "is-selected" : ""}`} aria-pressed={issueIds.includes(item.id)} onClick={() => toggleIssue(item.id)}>
-            <i aria-hidden="true">{issueIds.includes(item.id) ? "✓" : ""}</i>{item.sentence ? <span><b>出现混淆</b><small>{item.reading}</small></span> : <span><b>读成“{item.reading}”<em className="skip-reasons__pattern">{item.pattern}</em></b><small>{item.hint}</small></span>}</button>)}
-            <button type="button" className={`skip-reasons__item skip-reasons__item--ok ${issueIds.includes(ISSUE_ACCURATE_ID) ? "is-selected" : ""}`} aria-pressed={issueIds.includes(ISSUE_ACCURATE_ID)} onClick={() => toggleIssue(ISSUE_ACCURATE_ID)}>
-              <i aria-hidden="true">{issueIds.includes(ISSUE_ACCURATE_ID) ? "✓" : ""}</i><span><b>本项准确</b><small>老师听下来孩子读得基本准确</small></span></button></div></>}
+      {reasonStep ? <div className={`skip-reasons ${stage === "A" ? "skip-reasons--word" : ""}`}>
+        {issueSet && <><p>{stage === "B" ? "孩子这句读得怎么样？请老师勾选：" : `“${issueSet.word}”哪些发音还可以练习？可多选：`}</p>
+          <div className="skip-reasons__list" role="group" aria-label={stage === "A" ? "发音问题，可多选" : "孩子的实际读法"}>{issueSet.options.map((item) => <button type="button" key={item.id} className={`skip-reasons__item ${issueIds.includes(item.id) ? "is-selected" : ""}`} aria-pressed={issueIds.includes(item.id)} onClick={() => toggleIssue(item.id)}>
+            <i aria-hidden="true">{issueIds.includes(item.id) ? "✓" : ""}</i>{item.sentence ? <span><b>出现混淆</b><small>{item.reading}</small></span> : stage === "A" ? <span><b>{item.reading}</b></span> : <span><b>读成“{item.reading}”<em className="skip-reasons__pattern">{item.pattern}</em></b><small>{item.hint}</small></span>}</button>)}
+            {stage !== "A" && <button type="button" className={`skip-reasons__item skip-reasons__item--ok ${issueIds.includes(ISSUE_ACCURATE_ID) ? "is-selected" : ""}`} aria-pressed={issueIds.includes(ISSUE_ACCURATE_ID)} onClick={() => toggleIssue(ISSUE_ACCURATE_ID)}>
+              <i aria-hidden="true">{issueIds.includes(ISSUE_ACCURATE_ID) ? "✓" : ""}</i><span><b>本项准确</b><small>老师听下来孩子读得基本准确</small></span></button>}</div></>}
         <small className="skip-reasons__tip">{canConfirmSkip ? `已选 ${issueIds.length} 项` : "请至少选择一项"}</small></div>
       : feedback?.kind === "full" ? <div className="pron-result pron-result--correct"><span className="pron-burst" aria-hidden="true">{BURST.map((item, index) => <i key={index} style={item} />)}</span><span className="pron-result__badge">✨ 闯关成功</span><p><b>“{word}”</b>读得真棒！</p><div className="pron-result__star-card"><span>本题点亮</span><span className="pron-result__stars" aria-label="5颗星"><StarRating value={5} /></span><strong>5 / 5 星</strong></div>{feedback.nextId && <div className="pron-result__timer" aria-hidden="true"><i style={{ animationDuration: `${AUTO_ADVANCE_MS}ms` }} /></div>}<small>{feedback.nextId ? (stage === "B" ? "马上自动进入下一句 →" : "马上自动进入下一个字 →") : "本组题目已完成，真了不起！"}</small></div>
       : <div className="pron-result__hint"><div className="pron-result pron-result--retry"><div className="pron-result__star-card pron-result__star-card--soft"><span className="pron-result__stars" aria-label={`${feedback?.stars ?? 0}颗星`}><StarRating value={feedback?.stars ?? 0} inactiveGradient /></span><strong>{feedback?.stars ?? 0} / 5 星</strong></div></div>

@@ -20,7 +20,7 @@ export const stageConfigs: Record<StageId, StageConfig> = {
     name: "小阶段",
     fullName: "小阶段｜基础表达",
     positioning: "练习基础正音、气息和模仿表现",
-    description: "通过看图读词、小火车气息练习和动物模仿，观察孩子的基础表达能力。",
+    description: "通过看图读词、小火车气息练习和四种表情模仿，观察孩子的基础表达能力。",
     tagline: ["正音", "气息", "表现力"],
     suitableGrades: ["kindergarten-small", "kindergarten-middle", "kindergarten-large", "preschool"],
     moduleIds: ["A1", "A2", "A5"],

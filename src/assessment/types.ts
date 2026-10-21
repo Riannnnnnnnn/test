@@ -4,6 +4,7 @@ import type { AudioRecording } from "@/services/audio";
 export interface AssessmentModuleProps {
   stage?: StageId;
   studentGrade?: string;
+  studentGender?: "male" | "female" | "other";
   items?: Record<string, AssessmentResult>;
   onSelectItem?: (id: string) => void | Promise<void>;
   result: AssessmentResult;

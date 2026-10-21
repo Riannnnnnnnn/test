@@ -4,6 +4,7 @@ export interface CourseTask {
   title: string;
   text: string;
   image?: string;
+  imageFemale?: string;
   sound?: string;
   prompt?: string;
   hint?: string;
@@ -30,10 +31,15 @@ export const largePronunciationTasks: CourseTask[] = [
 ];
 
 export const smallExpressionTasks: CourseTask[] = [
-  { id: "A5-tiger", projectId: "A5", title: "小老虎", text: "嗷呜", image: "/assets/v2/questions/a5-tiger-v3.webp", prompt: "像小老虎一样神气地吼一声，再向前迈一步。" },
-  { id: "A5-dog", projectId: "A5", title: "小狗", text: "汪汪", image: "/assets/v3/animals/dog.webp", prompt: "像小狗一样开心地叫两声，摇摇尾巴。" },
-  { id: "A5-duck", projectId: "A5", title: "小鸭", text: "嘎嘎", image: "/assets/v3/animals/duck.webp", prompt: "像小鸭一样清脆地叫两声，拍拍翅膀。" },
+  { id: "A5-happy", projectId: "A5", title: "开心", text: "笑一笑，做出开心的表情。", image: "/assets/v3/emotions/boy-happy.webp", imageFemale: "/assets/v3/emotions/girl-happy.webp", prompt: "看看图片，模仿开心的表情，可以配上自己的动作。" },
+  { id: "A5-sad", projectId: "A5", title: "难过", text: "嘴角向下，做出难过的表情。", image: "/assets/v3/emotions/boy-sad.webp", imageFemale: "/assets/v3/emotions/girl-sad.webp", prompt: "看看图片，模仿难过的表情，可以配上自己的动作。" },
+  { id: "A5-shy", projectId: "A5", title: "害羞", text: "低低头，做出害羞的表情。", image: "/assets/v3/emotions/boy-shy.webp", imageFemale: "/assets/v3/emotions/girl-shy.webp", prompt: "看看图片，模仿害羞的表情，可以配上自己的动作。" },
+  { id: "A5-angry", projectId: "A5", title: "生气", text: "皱皱眉，做出生气的表情。", image: "/assets/v3/emotions/boy-angry.webp", imageFemale: "/assets/v3/emotions/girl-angry.webp", prompt: "看看图片，模仿生气的表情，可以配上自己的动作。" },
 ];
+
+export function getCourseTaskImage(task: Pick<CourseTask, "image" | "imageFemale">, gender?: string): string | undefined {
+  return gender === "female" ? task.imageFemale ?? task.image : task.image;
+}
 
 export const largeExpressionTask: CourseTask = {
   id: "B3-forest-announcer", projectId: "A5", title: "森林广播员", text: "森林里下雨啦！请先用着急的语气提醒小动物们躲雨，再用开心的语气告诉大家雨停了，可以出来玩。", prompt: "请把这段情境完整演出来。", hint: "说清楚发生了什么，表现两种不同语气，并配合表情和动作。",
