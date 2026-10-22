@@ -4,7 +4,7 @@ declare global {
   interface Window { webkitAudioContext?: typeof AudioContext; }
 }
 
-function getAudioContext(): AudioContext | undefined {
+export function getAudioContext(): AudioContext | undefined {
   const AudioContextClass = window.AudioContext ?? window.webkitAudioContext;
   if (!AudioContextClass) return undefined;
   audioContext ??= new AudioContextClass();

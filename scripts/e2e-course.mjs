@@ -189,7 +189,9 @@ try {
   await page.getByText('发声已停止，评测完成', { exact: true }).waitFor({ timeout: 12000 });
   await page.evaluate(() => { globalThis.silenceAfter = undefined; globalThis.testMicrophoneGain.gain.value = .24; });
   await button('开始气息评测').click();
-  await page.getByText('已到达终点，评测完成', { exact: true }).waitFor({ timeout: 20000 });
+  await page.getByText('火车到站啦，评测完成', { exact: true }).waitFor({ timeout: 20000 });
+  assert(await page.locator('.breath.is-arrived').isVisible());
+  assert(await page.getByText('到站啦！', { exact: true }).isVisible());
   await screenshot('气息-自动结束');
   console.log('PASS 小火车停声和到达终点自动结算');
   await button('下一项').click();
