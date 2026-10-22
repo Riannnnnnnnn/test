@@ -23,10 +23,8 @@ export function getSpeechReviewFeedback(result: XfyunIseResult, referenceText: s
         ? "系统只收到部分句子；请读完整句话，再点麦克风结束。不能据此判定读错。"
         : result.category === "read_sentence" && result.issues?.some((issue) => ["漏读", "增读", "回读", "替换"].includes(issue.kind))
           ? "评测检测到错漏读标记，但还不能确认是孩子读错还是录音被截断；请完整重读一次。"
-          : result.category === "read_sentence" && result.transcript?.trim()
-            ? `听写参考：“${result.transcript.trim()}”。听写和发音评测未能相互确认，请重读或请老师确认。`
-            : result.category === "read_sentence"
-              ? "听写没有返回可用文字，发音评测也未达到可靠条件；请完整重读，或请老师确认。"
+          : result.category === "read_sentence"
+              ? "句子的发音评测信息还不够完整；请完整重读，或请老师确认。"
               : "系统不能确认孩子读错了。请靠近麦克风再读一次，或请老师确认。",
   };
   if (result.contentStatus === "matched" && result.issues?.some((issue) => issue.kind.includes("声韵") || issue.kind.includes("声调"))) return {
@@ -42,11 +40,6 @@ export function getSpeechReviewFeedback(result: XfyunIseResult, referenceText: s
     kind: "reading",
     title: "读音可能不对",
     message: `好像不是“${referenceText}”，请看题目再清楚地说一次。如果已经读对，请老师复核。`,
-  };
-  if (result.reviewReasons.some((reason) => reason.includes("与题目不同") || reason.includes("听写没有识别到"))) return {
-    kind: "uncertain",
-    title: "识别结果待核对",
-    message: "听写结果与题目不一致，也可能是系统识别有误。请再读一次，或请老师听一听。",
   };
   if (result.issues?.some((issue) => issue.kind.includes("错误"))) return {
     kind: "pronunciation",

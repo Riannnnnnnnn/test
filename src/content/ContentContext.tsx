@@ -3,6 +3,24 @@ import { defaultSiteContent } from "./defaults";
 import type { SiteContent } from "./types";
 import { ContentContext, type ContentContextValue } from "./context";
 import { getSiteContent, saveSiteContent } from "@/services/storage";
+import { smallPronunciationTasks } from "@/config/courseTasks";
+
+const previousDefaultWords: Record<string, string> = {
+  "A1-b": "包子", "A1-p": "苹果", "A1-m": "帽子", "A1-d": "灯笼", "A1-t": "兔子",
+  "A1-g": "公鸡", "A1-k": "恐龙", "A1-ch": "车子", "A1-sh": "狮子", "A1-s": "扫帚",
+};
+
+function migrateTaskOverride(id: string, override: NonNullable<SiteContent["taskOverrides"]>[string]) {
+  const current = smallPronunciationTasks.find((task) => task.id === id);
+  const oldWord = previousDefaultWords[id];
+  const image = webpBuiltInImage(override.image);
+  return {
+    ...override,
+    ...(oldWord && current && override.text === oldWord ? { text: current.text } : {}),
+    ...(override.image !== undefined ? { image: id === "A1-p" && ["/assets/v2/questions/a1-apple.webp", "/assets/v2/questions/a1-apple-v3.webp"].includes(image ?? "") ? current?.image : image } : {}),
+    ...(override.imageFemale !== undefined ? { imageFemale: webpBuiltInImage(override.imageFemale) } : {}),
+  };
+}
 
 function cloneDefaults(): SiteContent {
   return structuredClone(defaultSiteContent);
@@ -20,8 +38,7 @@ function normalizeContent(saved: SiteContent): SiteContent {
   return {
     ...defaults,
     ...saved,
-    taskOverrides: saved.taskOverrides && Object.fromEntries(Object.entries(saved.taskOverrides).map(([id, override]) =>
-      [id, { ...override, ...(override.image !== undefined ? { image: webpBuiltInImage(override.image) } : {}), ...(override.imageFemale !== undefined ? { imageFemale: webpBuiltInImage(override.imageFemale) } : {}) }])),
+    taskOverrides: saved.taskOverrides && Object.fromEntries(Object.entries(saved.taskOverrides).map(([id, override]) => [id, migrateTaskOverride(id, override)])),
     brand: {
       ...defaults.brand,
       ...saved.brand,
@@ -42,13 +59,17 @@ function normalizeContent(saved: SiteContent): SiteContent {
       const customized = saved.modules?.[id as keyof SiteContent["modules"]];
       const merged = { ...module, ...customized, imageUrl: webpBuiltInImage(customized?.imageUrl) ?? module.imageUrl };
       const legacyDefaultImageUrls: Partial<Record<keyof SiteContent["modules"], string[]>> = {
-        A1: ["/assets/v2/questions/a1-apple.webp"],
+        A1: ["/assets/v2/questions/a1-apple.webp", "/assets/v2/questions/a1-apple-v3.webp"],
         A2: ["/assets/v2/questions/a2-train.webp", "/assets/v2/questions/a2-train-v2.webp"],
         A4: ["/assets/v2/questions/a4-new-friend.webp", "/assets/v2/questions/a4-new-friend-v2.webp"],
         A5: ["/assets/v2/questions/a5-tiger.webp", "/assets/v2/questions/a5-tiger-v3.webp", ...["boy", "girl"].flatMap((person) => ["happy", "sad", "shy", "angry"].map((mood) => `/assets/v3/emotions/${person}-${mood}.webp`))],
       };
       const legacyDefaultImageUrl = legacyDefaultImageUrls[id as keyof SiteContent["modules"]];
       if (!customized?.imageUrl || legacyDefaultImageUrl?.includes(merged.imageUrl)) merged.imageUrl = module.imageUrl;
+      if (id === "A1") {
+        if (customized?.visualText === "苹果") merged.visualText = module.visualText;
+        if (customized?.imageAlt === "卡通苹果") merged.imageAlt = module.imageAlt;
+      }
       if (id === "A3" && customized?.prompt === "先把三张图片排好顺序，再用“先、然后、最后”把故事讲出来。") merged.prompt = module.prompt;
       if (id === "A3" && customized?.teacherNote === "拖动图片或使用箭头调整顺序，排好后开始讲述。") merged.teacherNote = "";
       if (id === "A4" && customized?.teacherNote === "孩子理解场景后直接回答，不提供标准答案。") merged.teacherNote = "";

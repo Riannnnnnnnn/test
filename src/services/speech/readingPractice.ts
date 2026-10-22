@@ -26,7 +26,8 @@ export function getReadingPracticeAdvice(referenceText: string, evidence: XfyunI
   if (marked.length) {
     const parts: string[] = [];
     if (soundCharacters.length) {
-      const firstIsTarget = initial && soundCharacters.length === 1 && text.startsWith(soundCharacters[0]);
+      const targetCharacter = questionId === "A1-sh" && text === "老师" ? "师" : Array.from(text)[0];
+      const firstIsTarget = initial && soundCharacters.length === 1 && soundCharacters[0] === targetCharacter;
       parts.push(`重点练${quote(soundCharacters)}的${firstIsTarget ? `声母 ${initial} 和韵母` : "声母、韵母"}`);
     }
     if (toneCharacters.length) parts.push(`留意${quote(toneCharacters)}的声调`);

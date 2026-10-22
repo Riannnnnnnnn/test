@@ -11,17 +11,17 @@ export interface CourseTask {
 }
 
 export const smallPronunciationTasks: CourseTask[] = [
-  ["b", "包子", "/assets/v3/words/b.webp"], ["p", "苹果", "/assets/v2/questions/a1-apple-v3.webp"],
-  ["m", "帽子", "/assets/v3/words/m.webp"], ["f", "飞机", "/assets/v3/words/f.webp"],
-  ["d", "灯笼", "/assets/v3/words/d.webp"], ["t", "兔子", "/assets/v3/words/t.webp"],
+  ["b", "爸爸", "/assets/v3/words/b.webp"], ["p", "婆婆", "/assets/v3/words/p.webp"],
+  ["m", "猫咪", "/assets/v3/words/m.webp"], ["f", "飞机", "/assets/v3/words/f.webp"],
+  ["d", "弟弟", "/assets/v3/words/d.webp"], ["t", "糖果", "/assets/v3/words/t.webp"],
   ["n", "奶牛", "/assets/v3/words/n.webp"], ["l", "老虎", "/assets/v2/questions/a5-tiger-v3.webp"],
-  ["g", "公鸡", "/assets/v3/words/g.webp"], ["k", "恐龙", "/assets/v3/words/k.webp"],
+  ["g", "哥哥", "/assets/v3/words/g.webp"], ["k", "蝌蚪", "/assets/v3/words/k.webp"],
   ["h", "花朵", "/assets/v3/words/h.webp"], ["j", "鸡蛋", "/assets/v3/words/j.webp"],
   ["q", "气球", "/assets/v3/words/q.webp"], ["x", "西瓜", "/assets/v3/words/x.webp"],
-  ["zh", "蜘蛛", "/assets/v3/words/zh.webp"], ["ch", "车子", "/assets/v3/words/ch.webp"],
-  ["sh", "狮子", "/assets/v3/words/sh.webp"], ["r", "热气球", "/assets/v3/words/r.webp"],
+  ["zh", "蜘蛛", "/assets/v3/words/zh.webp"], ["ch", "吃饭", "/assets/v3/words/ch.webp"],
+  ["sh", "老师", "/assets/v3/words/sh.webp"], ["r", "热气球", "/assets/v3/words/r.webp"],
   ["z", "足球", "/assets/v3/words/z.webp"], ["c", "草莓", "/assets/v3/words/c.webp"],
-  ["s", "扫帚", "/assets/v3/words/s.webp"], ["y", "月亮", "/assets/v3/words/y.webp"],
+  ["s", "色彩", "/assets/v3/words/s.webp"], ["y", "月亮", "/assets/v3/words/y.webp"],
   ["w", "乌龟", "/assets/v3/words/w.webp"],
 ].map(([id, text, image]) => ({ id: `A1-${id}`, projectId: "A1", title: `声母 ${id}`, text: text!, image: image! }));
 

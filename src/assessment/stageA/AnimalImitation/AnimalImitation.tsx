@@ -8,11 +8,13 @@ import { getCourseTasks, getCourseTaskImage, type CourseTask } from "@/config/co
 
 /** 表情模仿只做“看图—跟做—保持”的陪伴式演示，不录音、不改动评分数据；星级仍由老师在底部评分。 */
 const COUNTDOWN_SECONDS = 3;
-const HOLD_MS = 5000;
+const HOLD_MS = 3000;
+// 素材约 1.46 秒；最后一声快门在 1.04 秒左右，闪光对准这一声。
+const SHUTTER_FLASH_DELAY_MS = 1050;
 const TICK_MS = 100;
 
 type Mood = "happy" | "sad" | "shy" | "angry";
-type Phase = "idle" | "counting" | "holding" | "done";
+type Phase = "idle" | "counting" | "preparing" | "holding" | "done";
 
 const MOODS: Record<Mood, { color: string; soft: string; deep: string }> = {
   happy: { color: "#ffb81f", soft: "#fff1bd", deep: "#8a5200" },
@@ -55,35 +57,113 @@ function EmotionStage({ tasks, selected, studentGender, onSelectItem }: { tasks:
   const [held, setHeld] = useState(0);
   const [finished, setFinished] = useState<string[]>([]);
   const timer = useRef(0);
+  const soundContext = useRef<AudioContext | null>(null);
+  const shutterBuffer = useRef<AudioBuffer | null>(null);
+  const shutterLoadFailed = useRef(false);
+  const shutterLoad = useRef<Promise<void> | null>(null);
+  const shutterStartedAt = useRef<number | null>(null);
+  const activeSounds = useRef(new Set<AudioScheduledSourceNode>());
+  const soundRun = useRef(0);
+  const lastCue = useRef(0);
   const stop = () => window.clearInterval(timer.current);
+  const stopSounds = () => {
+    soundRun.current += 1;
+    for (const sound of activeSounds.current) { try { sound.stop(); } catch { /* 已结束的短音无需再停止 */ } }
+    activeSounds.current.clear();
+  };
+  const playTone = (frequency: number, duration: number, delay = 0, peak = 0.055) => {
+    const context = soundContext.current;
+    if (!context) return;
+    const startAt = context.currentTime + delay;
+    const sound = context.createOscillator();
+    const volume = context.createGain();
+    sound.type = "sine";
+    sound.frequency.setValueAtTime(frequency, startAt);
+    volume.gain.setValueAtTime(0.0001, startAt);
+    volume.gain.exponentialRampToValueAtTime(peak, startAt + 0.025);
+    volume.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+    sound.connect(volume).connect(context.destination);
+    sound.onended = () => { activeSounds.current.delete(sound); sound.disconnect(); volume.disconnect(); };
+    activeSounds.current.add(sound);
+    sound.start(startAt);
+    sound.stop(startAt + duration + 0.01);
+  };
+  const playCountdownCue = (number: number) => playTone(({ 3: 523.25, 2: 659.25, 1: 783.99 } as Record<number, number>)[number], 0.18);
+  const playFinishCue = () => {
+    playTone(523.25, 0.28, 0, 0.04);
+    playTone(659.25, 0.38, 0.18, 0.035);
+  };
+  const playShutterCue = () => {
+    const context = soundContext.current;
+    if (!context || !shutterBuffer.current) return;
+    const shutter = context.createBufferSource();
+    const volume = context.createGain();
+    shutter.buffer = shutterBuffer.current;
+    volume.gain.value = 0.8;
+    shutter.connect(volume).connect(context.destination);
+    shutter.onended = () => { activeSounds.current.delete(shutter); shutter.disconnect(); volume.disconnect(); };
+    activeSounds.current.add(shutter);
+    shutter.start();
+  };
+  const prepareShutterCue = (context: AudioContext) => {
+    shutterLoad.current ??= fetch("/assets/v3/audio/camera-shutter.mp3")
+      .then((response) => { if (!response.ok) throw new Error("快门音效加载失败"); return response.arrayBuffer(); })
+      .then((data) => context.decodeAudioData(data))
+      .then((buffer) => { shutterBuffer.current = buffer; })
+      .catch(() => { shutterLoadFailed.current = true; });
+  };
 
   // 换题或离开页面时，清掉进行中的倒计时。
-  useEffect(() => { stop(); setPhase("idle"); setCount(COUNTDOWN_SECONDS); setHeld(0); return stop; }, [selected.id]);
+  useEffect(() => { stop(); stopSounds(); setPhase("idle"); setCount(COUNTDOWN_SECONDS); setHeld(0); return () => { stop(); stopSounds(); }; }, [selected.id]);
+  useEffect(() => () => { void soundContext.current?.close(); }, []);
 
   const start = () => {
-    stop();
+    stop(); stopSounds(); shutterStartedAt.current = null;
+    const run = soundRun.current;
+    try {
+      soundContext.current ??= new AudioContext();
+      prepareShutterCue(soundContext.current);
+      if (soundContext.current.state === "running") playCountdownCue(COUNTDOWN_SECONDS);
+      else void soundContext.current.resume().then(() => { if (soundRun.current === run) playCountdownCue(COUNTDOWN_SECONDS); }).catch(() => undefined);
+    } catch { /* 不支持声音时仍可使用视觉倒计时 */ }
     setPhase("counting"); setCount(COUNTDOWN_SECONDS); setHeld(0);
+    lastCue.current = COUNTDOWN_SECONDS;
     let elapsed = 0;
     timer.current = window.setInterval(() => {
       elapsed += TICK_MS;
       const counting = COUNTDOWN_SECONDS * 1000;
-      if (elapsed < counting) { setCount(Math.ceil((counting - elapsed) / 1000)); return; }
-      const holding = elapsed - counting;
-      if (holding < HOLD_MS) { setPhase("holding"); setHeld(holding / HOLD_MS); return; }
-      stop(); setHeld(1); setPhase("done");
+      if (elapsed < counting) {
+        const remaining = Math.ceil((counting - elapsed) / 1000);
+        if (remaining !== lastCue.current) { lastCue.current = remaining; playCountdownCue(remaining); }
+        setCount(remaining);
+        return;
+      }
+      if (shutterStartedAt.current === null) {
+        if (shutterBuffer.current || shutterLoadFailed.current || elapsed >= counting + 2000) {
+          playShutterCue();
+          shutterStartedAt.current = elapsed;
+        }
+        setCount(0); setPhase("preparing"); return;
+      }
+      const holding = elapsed - shutterStartedAt.current - SHUTTER_FLASH_DELAY_MS;
+      if (holding < 0) { setPhase("preparing"); return; }
+      if (holding < HOLD_MS) {
+        setPhase("holding"); setHeld(holding / HOLD_MS); return;
+      }
+      stop(); playFinishCue(); setHeld(1); setPhase("done");
       setFinished((current) => current.includes(selected.id) ? current : [...current, selected.id]);
     }, TICK_MS);
   };
-  const cancel = () => { stop(); setPhase("idle"); setCount(COUNTDOWN_SECONDS); setHeld(0); };
+  const cancel = () => { stop(); stopSounds(); shutterStartedAt.current = null; setPhase("idle"); setCount(COUNTDOWN_SECONDS); setHeld(0); };
 
   const index = tasks.findIndex((task) => task.id === selected.id);
   const next = [...tasks.slice(index + 1), ...tasks.slice(0, index)].find((task) => !finished.includes(task.id));
   const doneCount = finished.length;
   const secondsLeft = Math.max(0, Math.ceil(HOLD_MS / 1000 * (1 - held)));
 
-  const headline = phase === "counting" ? `${count} 秒后开始，准备好` : phase === "holding" ? "保持住，别动！" : phase === "done" ? "跟做完成，请老师评价" : "准备好就做出来";
-  const hint = phase === "idle" ? "点按钮，跟着图片做表情" : phase === "counting" ? "看着屏幕，慢慢做出表情" : phase === "holding" ? "表情保持 5 秒，老师在旁边观察" : next ? "可以进入下一个表情，或再来一次" : "四种表情都完成啦";
-  const chip = phase === "idle" ? "待机" : phase === "counting" ? "倒计时" : phase === "holding" ? "保持中" : "已完成";
+  const headline = phase === "counting" ? `${count} 秒后开始，准备好` : phase === "preparing" ? "准备拍照，做好表情！" : phase === "holding" ? "保持住，别动！" : phase === "done" ? "跟做完成，请老师评价" : "准备好就做出来";
+  const hint = phase === "idle" ? "点按钮，跟着图片做表情" : phase === "counting" ? "看着屏幕，慢慢做出表情" : phase === "preparing" ? "听到咔嚓声，就保持表情" : phase === "holding" ? "快门已拍下，表情保持 3 秒" : next ? "可以进入下一个表情，或再来一次" : "四种表情都完成啦";
+  const chip = phase === "idle" ? "待机" : phase === "counting" ? "倒计时" : phase === "preparing" ? "准备拍照" : phase === "holding" ? "保持中" : "已完成";
   const style = { "--mood": palette.color, "--mood-soft": palette.soft, "--mood-deep": palette.deep, "--held": held } as CSSProperties;
 
   return <Card className={`pro-card expr expr--${mood} is-${phase}`} style={style}>
@@ -115,6 +195,7 @@ function EmotionStage({ tasks, selected, studentGender, onSelectItem }: { tasks:
         {image && <img className="expr__figure" src={image} alt={`${girl ? "女孩" : "男孩"}${selected.title}的半身像`} />}
         <svg className="expr__ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect x="1.5" y="1.5" width="97" height="97" rx="12" pathLength="100" strokeDasharray="100" strokeDashoffset={100 - held * 100} vectorEffect="non-scaling-stroke" /></svg>
         {phase === "counting" && <span className="expr__count" key={count} aria-hidden="true">{count}</span>}
+        {phase === "holding" && <span className="expr__shutter" aria-hidden="true"><i /><i /><b /></span>}
         {phase === "done" && <span className="expr__burst" aria-hidden="true">{BURST.map((item, i) => <i key={i} style={item} />)}</span>}
       </div>
       <div className="expr__copy">
@@ -124,11 +205,11 @@ function EmotionStage({ tasks, selected, studentGender, onSelectItem }: { tasks:
       </div>
     </section>
 
-    <div className={`vc expr__console vc--${phase === "counting" ? "connecting" : phase === "holding" ? "listening" : phase}`}>
+    <div className={`vc expr__console vc--${phase === "counting" || phase === "preparing" ? "connecting" : phase === "holding" ? "listening" : phase}`}>
       <div className="vc__mic">
         <div className="vc__orb-wrap">
           <i className="vc__ripple" aria-hidden="true" /><i className="vc__ripple vc__ripple--2" aria-hidden="true" /><i className="vc__ripple vc__ripple--3" aria-hidden="true" />
-          <button type="button" className="vc__orb expr__orb" onClick={phase === "counting" || phase === "holding" ? cancel : start} aria-label={phase === "idle" ? "开始跟做表情" : phase === "done" ? "再做一次" : "停止"}>
+          <button type="button" className="vc__orb expr__orb" onClick={phase === "counting" || phase === "preparing" || phase === "holding" ? cancel : start} aria-label={phase === "idle" ? "开始跟做表情" : phase === "done" ? "再做一次" : "停止"}>
             {phase === "counting" ? <b className="expr__orb-num">{count}</b> : phase === "holding" ? <b className="expr__orb-num">{secondsLeft}</b> : phase === "done" ? <ReplayIcon /> : <SmileIcon />}
           </button>
         </div>
@@ -138,7 +219,7 @@ function EmotionStage({ tasks, selected, studentGender, onSelectItem }: { tasks:
         <div className="vc__status">
           <span className="vc__chip"><i aria-hidden="true" />{chip}</span>
           <strong className="vc__headline">{headline}</strong>
-          <time className="vc__timer">{phase === "holding" ? `${(held * HOLD_MS / 1000).toFixed(1)}s` : phase === "done" ? "5.0s" : "0.0s"}</time>
+          <time className="vc__timer">{phase === "holding" ? `${(held * HOLD_MS / 1000).toFixed(1)}s` : phase === "done" ? "3.0s" : "0.0s"}</time>
         </div>
         <div className="expr__scope" aria-hidden="true">{Array.from({ length: 10 }, (_, i) => <i key={i} className={held * 10 > i || phase === "done" ? "is-on" : ""} />)}</div>
         <small className="vc__hint">{hint}</small>

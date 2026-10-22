@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { VoiceConsole, type VoiceDimension } from "@/assessment/common/VoiceConsole/VoiceConsole";
 import { warmMicrophone } from "@/services/audio/microphone";
-import { SmartEvaluationUnavailableError, SpeechContentMismatchError, matchesReferenceText, preparePhoneticMatcher, prepareSpeechAuth, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
+import { SmartEvaluationUnavailableError, SpeechContentMismatchError, prepareSpeechAuth, startPreviewSpeechSession, startXfyunIse, type XfyunIseResult, type XfyunIseSession } from "@/services/speech/xfyunIse";
 import { hasBlockingSpeechReview, speechDimensionStars, strictPronunciationStars } from "@/services/scoring/pronunciation";
 import { getSpeechReviewFeedback } from "@/services/speech/reviewFeedback";
 
@@ -62,8 +62,7 @@ export const SmartSpeechEvaluator = forwardRef<SmartSpeechEvaluatorHandle, Smart
       silenceSince.current = 0;
       return;
     }
-    // Short children's words need enough trailing audio for IAT to avoid
-    // interpreting only the first sound as the whole answer.
+    // Keep enough trailing audio for the child's full word to reach ISE.
     if (!heardSince.current || now - heardSince.current < (sentence ? 350 : 550)) return;
     if (!silenceSince.current) silenceSince.current = now;
     // Leave room for a child's pause at the comma. A sentence can also be
@@ -75,7 +74,7 @@ export const SmartSpeechEvaluator = forwardRef<SmartSpeechEvaluatorHandle, Smart
   };
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; listening.current = false; window.clearTimeout(maximumTimer.current); window.clearTimeout(noSpeechTimer.current); session.current?.cancel(); }; }, []);
-  useEffect(() => { void prepareSpeechAuth().catch(() => undefined); void preparePhoneticMatcher().catch(() => undefined); void warmMicrophone(); }, [referenceText]);
+  useEffect(() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }, [referenceText]);
   useEffect(() => {
     if (evidence || initialScore !== undefined || initialPreview || state !== "done") return;
     setState("idle");
@@ -217,12 +216,12 @@ export const SmartSpeechEvaluator = forwardRef<SmartSpeechEvaluatorHandle, Smart
     const score = finalEvidence?.accuracyScore ?? dimensionRatings?.accuracyScore;
     dimensionItems.push({ key: "accuracyScore", label: "朗读准确度", done: score !== undefined && !(finalEvidence && hasBlockingSpeechReview(finalEvidence)), stars: finalEvidence ? speechDimensionStars(finalEvidence, "accuracyScore") : strictRating ? strictPronunciationStars(score) : getStars(score) });
   } else {
-    const matched = Boolean(isDone && !isPreview && finalEvidence && (finalEvidence.contentStatus === "matched" || (!finalEvidence.contentStatus && finalEvidence.transcript && matchesReferenceText(finalEvidence.transcript, referenceText) && !finalEvidence.reviewReasons?.length)));
+    const matched = Boolean(isDone && !isPreview && finalEvidence && finalEvidence.contentStatus === "matched");
     const review = Boolean(isDone && !isPreview && finalEvidence && !matched);
-    dimensionItems.push({ key: "wordMatch", label: "词语匹配", done: matched, stars: 0, statusText: matched ? "已匹配" : review ? finalEvidence?.contentStatus === "mismatch" ? "可能读错" : "没听清" : "待检测", statusTone: matched ? "success" : review ? "review" : "pending" });
+    dimensionItems.push({ key: "wordMatch", label: "字音评测", done: matched, stars: 0, statusText: matched ? "已评测" : review ? "待确认" : "待检测", statusTone: matched ? "success" : review ? "review" : "pending" });
   }
 
-  return <VoiceConsole state={needsReview ? "error" : state} level={volume} timer={formatTime(seconds)} headline={headline} hint={hint} micLabel={micLabel} micAria={micAria} onStart={start} onStop={sentence ? () => { if (listening.current && !autoFinishing.current) { autoFinishing.current = true; void finish(); } } : undefined} onPrepare={() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }} dimensions={dimensionItems} dimensionsAria={sentence ? "三个维度的智能评星" : "声韵、声调和词语匹配结果"}>
+  return <VoiceConsole state={needsReview ? "error" : state} level={volume} timer={formatTime(seconds)} headline={headline} hint={hint} micLabel={micLabel} micAria={micAria} onStart={start} onStop={sentence ? () => { if (listening.current && !autoFinishing.current) { autoFinishing.current = true; void finish(); } } : undefined} onPrepare={() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }} dimensions={dimensionItems} dimensionsAria={sentence ? "三个维度的智能评星" : "声韵、声调和字音评测结果"}>
     {isDone && reviewFeedback && <div className={`vc__review vc__review--${reviewFeedback.kind}`} role="alert"><span className="vc__review-mark" aria-hidden="true">{reviewFeedback.kind === "reading" ? "×" : "!"}</span><strong>{reviewFeedback.title}</strong><span>{reviewFeedback.message}</span></div>}
     {error && <div className={`vc__error ${errorKind === "mismatch" ? "vc__error--mismatch" : ""}`} role="alert">
       <button type="button" className="vc__error-retry" onClick={start} aria-label="重新评测" title="重新评测"><img src="/assets/icons/refresh.svg" alt="" /><strong>{errorKind === "mismatch" ? "再试一次" : "重新评测"}</strong></button>

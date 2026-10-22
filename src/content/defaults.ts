@@ -16,7 +16,7 @@ export const defaultSiteContent: SiteContent = {
     C: { name: "综合表达", tagline: "信息组织 · 临场回应 · 内容生成 · 精准表达", iconImageUrl: "", iconImageAlt: "C 段综合表达" },
   },
   modules: {
-    A1: { menuTitle: "发音清晰度", summary: "看图说出名称", eyebrow: "A1 · 发音清晰度", title: "看图说词", prompt: "请看图片，直接说出它的名称。", teacherNote: "", imageUrl: "/assets/v2/questions/a1-apple-v3.webp", imageAlt: "卡通苹果", visualText: "苹果", secondaryText: "" },
+    A1: { menuTitle: "发音清晰度", summary: "看图说出名称", eyebrow: "A1 · 发音清晰度", title: "看图说词", prompt: "请看图片，直接说出它的名称。", teacherNote: "", imageUrl: "/assets/v3/words/p.webp", imageAlt: "卡通婆婆", visualText: "婆婆", secondaryText: "" },
     A2: { menuTitle: "基础气息", summary: "持续发声让小火车前进", eyebrow: "A2 · 基础气息", title: "小火车出发", prompt: "深吸一口气，持续发出“呜——”，让小火车尽可能平稳地前进。", teacherNote: "保持自然发声，观察持续时间和中断次数。", imageUrl: "/assets/v2/questions/a2-train-v3.webp", imageAlt: "右向侧视卡通小火车", visualText: "呜——", secondaryText: "终点" },
     A3: { menuTitle: "三图顺序表达", summary: "排序后完整讲述", eyebrow: "A3 · 三图顺序表达", title: "种下一颗种子", prompt: "拖动或点击按钮把三张图片排好顺序，再用“先、然后、最后”把故事讲出来。", teacherNote: "", imageUrl: "", imageAlt: "三图排序", visualText: "", secondaryText: "", sequenceItems: [
       { key: "seed", connector: "先", title: "种下种子", symbol: "种", imageUrl: "/assets/v2/questions/a3-seed-v3.webp" },

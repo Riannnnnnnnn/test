@@ -3,7 +3,7 @@ import type { XfyunIseResult } from "@/services/speech/xfyunIse";
 // Product display thresholds, not a scientifically calibrated accuracy model.
 export function strictPronunciationStars(score?: number): number {
   if (score === undefined) return 0;
-  if (score >= 98) return 5;
+  if (score >= 99.5) return 5;
   if (score >= 88) return 4;
   if (score >= 75) return 3;
   if (score >= 60) return 2;
@@ -28,7 +28,10 @@ export function speechDimensionStars(result: XfyunIseResult, key: "pronunciation
       : issueKinds.filter((kind) => kind.includes("错误"));
   // Engine-level phoneme mistakes should not receive five stars even when the
   // aggregate score is high. The raw engine score remains untouched.
-  const maximum = related.length >= 2 ? 3 : related.length === 1 ? 4 : 5;
+  const weakWordSound = ["read_word", "read_syllable"].includes(result.category ?? "")
+    && key === "pronunciationScore" && Boolean(result.soundConfidenceWarnings?.length);
+  const extraSpeech = issueKinds.some((kind) => kind === "增读" || kind === "回读");
+  const maximum = related.length >= 2 ? 3 : related.length === 1 || weakWordSound || extraSpeech ? 4 : 5;
   return Math.min(strictPronunciationStars(score), maximum);
 }
 
@@ -44,7 +47,12 @@ export function scorePronunciation(result: XfyunIseResult) {
   const issueKinds = result.issues?.map((issue) => issue.kind) ?? [];
   const pronunciationIssues = issueKinds.filter((kind) => kind.includes("声韵") || kind.includes("声调"));
   // Preserve the engine evidence, but do not present a flagged sound as perfect.
-  const cappedBasis = basis === undefined ? undefined : Math.min(basis, pronunciationIssues.length >= 2 ? 87 : pronunciationIssues.length === 1 || (sentence && issueKinds.some((kind) => alignmentIssues.has(kind))) ? 97 : 100);
+  const weakWordSound = !sentence && Boolean(result.soundConfidenceWarnings?.length);
+  // These are whole-recording scores, not a separately re-scored audio crop.
+  // Retain partial credit for extra speech, but do not certify a perfect take.
+  const extraSpeech = issueKinds.some((kind) => kind === "增读" || kind === "回读");
+  const incompleteSentenceEvidence = sentence && [result.pronunciationScore, result.toneScore, result.accuracyScore, result.integrityScore].some((value) => value === undefined);
+  const cappedBasis = basis === undefined ? undefined : Math.min(basis, pronunciationIssues.length >= 2 ? 87 : pronunciationIssues.length === 1 || extraSpeech || (sentence && issueKinds.some((kind) => alignmentIssues.has(kind))) || incompleteSentenceEvidence ? 97 : weakWordSound ? 99 : 100);
   const pronunciationClarity = hasBlockingSpeechReview(result) ? undefined : cappedBasis;
   const scores: Record<string, number> = {};
   if (pronunciationClarity !== undefined) scores.pronunciationClarity = pronunciationClarity;

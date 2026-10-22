@@ -9,6 +9,7 @@ import { scorePronunciation } from "@/services/scoring/pronunciation";
 import { getCourseTasks } from "@/config/courseTasks";
 import { describeIssue, getPronunciationIssues, ISSUE_ACCURATE_ID } from "@/config/pronunciationIssues";
 import { TaskPicker } from "@/assessment/common/TaskPicker/TaskPicker";
+import { playResultCue } from "@/services/audio/resultCues";
 
 const AUTO_ADVANCE_MS = 2000;
 const BURST_COLORS = ["#ffd44c", "#ff952b", "#ff7ab6", "#7ad7ff", "#9b6bff"];
@@ -29,7 +30,27 @@ export function Pronunciation({ onResultChange, result, stage, studentGrade, ite
   const [issueIds, setIssueIds] = useState<string[]>([]);
   const evaluatorRef = useRef<SmartSpeechEvaluatorHandle>(null);
   const advanceTimer = useRef(0);
-  useEffect(() => () => window.clearTimeout(advanceTimer.current), []);
+  const resultAudio = useRef<AudioContext | null>(null);
+  const resultSounds = useRef(new Set<OscillatorNode>());
+  const soundRun = useRef(0);
+  const stopResultSound = () => {
+    soundRun.current += 1;
+    for (const sound of resultSounds.current) { try { sound.stop(); } catch { /* 已播完 */ } }
+    resultSounds.current.clear();
+  };
+  const unlockResultSound = () => {
+    try { resultAudio.current ??= new AudioContext(); void resultAudio.current.resume().catch(() => undefined); }
+    catch { /* 无声音时仍可看成绩 */ }
+  };
+  const playStarsSound = (stars: number) => {
+    stopResultSound();
+    const context = resultAudio.current;
+    if (!context) return;
+    const run = soundRun.current;
+    if (context.state === "running") playResultCue(context, stars, resultSounds.current);
+    else void context.resume().then(() => { if (soundRun.current === run) playResultCue(context, stars, resultSounds.current); }).catch(() => undefined);
+  };
+  useEffect(() => () => { window.clearTimeout(advanceTimer.current); stopResultSound(); void resultAudio.current?.close(); }, []);
   const { content } = useSiteContent();
   const module = content.modules.A1;
   const tasks = stage ? getCourseTasks(stage, "A1") : [];
@@ -38,11 +59,11 @@ export function Pronunciation({ onResultChange, result, stage, studentGrade, ite
   const word = selected?.text ?? (module.visualText || module.imageAlt);
   const characters = Array.from(word);
   const configuredPinyin = module.secondaryText.trim().split(/\s+/).filter(Boolean);
-  const fallbackPinyin = word === "苹果" ? ["píng", "guǒ"] : characters.map(() => "");
+  const fallbackPinyin = word === "婆婆" ? ["pó", "po"] : characters.map(() => "");
   const pinyin = configuredPinyin.length === characters.length ? configuredPinyin : fallbackPinyin;
   const imageUrl = selected?.image ?? module.imageUrl;
   const picture = imageUrl ? <div className="module-uploaded-image"><img src={imageUrl} alt={selected?.text ?? module.imageAlt} /></div> : <div className="picture-placeholder picture-placeholder--apple" role="img" aria-label={module.imageAlt}><span className="apple-leaf" /></div>;
-  const closeFeedback = () => { window.clearTimeout(advanceTimer.current); setFeedback(undefined); setReasonStep(false); setIssueIds([]); };
+  const closeFeedback = () => { window.clearTimeout(advanceTimer.current); stopResultSound(); setFeedback(undefined); setReasonStep(false); setIssueIds([]); };
   const issueSet = getPronunciationIssues(selected?.id);
   const toggleIssue = (id: string) => {
     if (id === ISSUE_ACCURATE_ID) { setIssueIds((current) => current.includes(id) ? [] : [id]); return; }
@@ -79,24 +100,25 @@ export function Pronunciation({ onResultChange, result, stage, studentGrade, ite
       const full = matched && stars >= 5;
       const reason = evaluation.reviewReasons?.find((item) => /噪声|音量|截幅|音频输入|拒评|缺少准确度/.test(item));
       const weakInitial = evaluation.contentStatus === "uncertain" ? evaluation.initialConfidenceWarnings?.[0] : undefined;
-      const detail = weakInitial ? `“${weakInitial.text}”的声母${weakInitial.sound ? `“${weakInitial.sound}”` : ""}暂时无法确认；这不代表孩子一定读错。请再读一次或请老师听录音确认。` : reason ? `评测提示：${reason}。` : evaluation.transcript?.trim()
-        ? `语音听写参考：“${evaluation.transcript.trim()}”。${evaluation.contentStatus === "mismatch" ? "评测也检测到读音或错漏读问题。" : "听写与评测结果未能相互确认，不能据此判定孩子读错。"}`
-        : "语音听写没有返回可用文字；这不代表孩子读错了。";
+      const detail = weakInitial ? `“${weakInitial.text}”的声母${weakInitial.sound ? `“${weakInitial.sound}”` : ""}暂时无法确认；这不代表孩子一定读错。请再读一次或请老师听录音确认。` : reason ? `评测提示：${reason}。`
+        : matched ? "本次依据声韵和声调评分。请听老师示范，再练习目标字音。"
+          : "尚未获得完整、可靠的目标字音信息，请再读一次或请老师确认。";
       setReasonStep(false); setIssueIds([]);
       setFeedback({ kind: full ? "full" : matched && stars > 0 ? "partial" : evaluation.contentStatus === "mismatch" ? "wrong" : weakInitial ? "sound-review" : "uncertain", stars, nextId: next?.id, detail });
+      playStarsSound(stars);
       if (full && next && onSelectItem) advanceTimer.current = window.setTimeout(() => { void advanceTo(next.id); }, AUTO_ADVANCE_MS);
     }
   };
   const resetEvaluation = () => onResultChange({ status: "running", autoScores: undefined, teacherScores: undefined, transcript: undefined, rawResult: undefined });
   const initialLabel = stage === "A" && selected?.title.startsWith("声母 ") ? selected.title.replace("声母 ", "") : undefined;
-  return <Card className={`pro-card pron ${stage === "B" ? "pron--sentence" : stage === "A" ? "pron--initials" : ""}`}>
+  return <Card className={`pro-card pron ${stage === "B" ? "pron--sentence" : stage === "A" ? "pron--initials" : ""}`} onPointerDownCapture={unlockResultSound} onKeyDownCapture={(event) => { if (event.key === "Enter" || event.key === " ") unlockResultSound(); }}>
     <div className="pron__picker">
       {selected ? <TaskPicker tasks={tasks} selectedId={selected.id} items={items} onSelect={onSelectItem} initials={stage === "A"} /> : <><p className="eyebrow">{module.eyebrow}</p><h2>{module.title}</h2><p>{module.prompt}</p></>}
     </div>
     <div className="pron__stage">
       {stage !== "B" && <div className="pron__art" key={`art-${selected?.id ?? "legacy"}`}><span className="pron__halo" aria-hidden="true" /><span className="pron__orbit" aria-hidden="true" /><span className="pron__sparkles" aria-hidden="true">{SPARKLES.map((item, index) => <i key={index} style={item} />)}</span>{picture}</div>}
       <div className="pron__word" aria-label={word} key={`word-${selected?.id ?? "legacy"}`}>
-        {selected && <span className="pron__tag">{initialLabel ? <><em>目标声母</em><b>{initialLabel}</b></> : <em>{selected.title}</em>}</span>}
+        {selected && <span className="pron__tag">{initialLabel ? <><em>{selected.id === "A1-sh" && word === "老师" ? "“师”的声母" : "目标声母"}</em><b>{initialLabel}</b></> : <em>{selected.title}</em>}</span>}
         {selected ? <strong className={stage === "B" ? "course-sentence" : "course-word"}>{word}</strong> : <div className="pronunciation-card__syllables">
           {characters.map((character, index) => <div className="pronunciation-card__syllable" key={`${character}-${index}`}>
             <span>{pinyin[index]}</span><strong>{character}</strong>
@@ -110,7 +132,7 @@ export function Pronunciation({ onResultChange, result, stage, studentGrade, ite
         ? <><Button variant="secondary" onClick={() => setReasonStep(false)}>返回</Button><Button disabled={!canConfirmSkip} onClick={() => void confirmSkip()}>确认，下一个字</Button></>
         : feedback?.kind === "full"
           ? <Button onClick={() => void advanceTo(feedback.nextId)}>{feedback.nextId ? (stage === "B" ? "立即下一句" : "立即下一个字") : "完成本题"}</Button>
-          : <><Button variant="secondary" onClick={retryFromFeedback}>再试一次</Button><Button onClick={() => { setIssueIds([]); setReasonStep(true); }}>跳过</Button></>}</div>}>
+          : <><Button variant="secondary" onClick={retryFromFeedback}>再试一次</Button><Button onClick={() => { setIssueIds([]); setReasonStep(true); }}>评语</Button></>}</div>}>
       {reasonStep ? <div className={`skip-reasons ${stage === "A" ? "skip-reasons--word" : ""}`}>
         {issueSet && <><p>{stage === "B" ? "孩子这句读得怎么样？请老师勾选：" : `“${issueSet.word}”哪些发音还可以练习？可多选：`}</p>
           <div className="skip-reasons__list" role="group" aria-label={stage === "A" ? "发音问题，可多选" : "孩子的实际读法"}>{issueSet.options.map((item) => <button type="button" key={item.id} className={`skip-reasons__item ${issueIds.includes(item.id) ? "is-selected" : ""}`} aria-pressed={issueIds.includes(item.id)} onClick={() => toggleIssue(item.id)}>
@@ -120,7 +142,7 @@ export function Pronunciation({ onResultChange, result, stage, studentGrade, ite
         <small className="skip-reasons__tip">{canConfirmSkip ? `已选 ${issueIds.length} 项` : "请至少选择一项"}</small></div>
       : feedback?.kind === "full" ? <div className="pron-result pron-result--correct"><span className="pron-burst" aria-hidden="true">{BURST.map((item, index) => <i key={index} style={item} />)}</span><span className="pron-result__badge">✨ 闯关成功</span><p><b>“{word}”</b>读得真棒！</p><div className="pron-result__star-card"><span>本题点亮</span><span className="pron-result__stars" aria-label="5颗星"><StarRating value={5} /></span><strong>5 / 5 星</strong></div>{feedback.nextId && <div className="pron-result__timer" aria-hidden="true"><i style={{ animationDuration: `${AUTO_ADVANCE_MS}ms` }} /></div>}<small>{feedback.nextId ? (stage === "B" ? "马上自动进入下一句 →" : "马上自动进入下一个字 →") : "本组题目已完成，真了不起！"}</small></div>
       : <div className="pron-result__hint"><div className="pron-result pron-result--retry"><div className="pron-result__star-card pron-result__star-card--soft"><span className="pron-result__stars" aria-label={`${feedback?.stars ?? 0}颗星`}><StarRating value={feedback?.stars ?? 0} inactiveGradient /></span><strong>{feedback?.stars ?? 0} / 5 星</strong></div></div>
-        <p>{feedback?.kind === "partial" ? `“${word}”还没有拿到满星，可以再试一次；也可以先跳过。` : feedback?.kind === "wrong" ? `“${word}”的读音可能不对，可以再读一次；如果孩子已经读对，请老师确认。` : feedback?.kind === "sound-review" ? `“${word}”的声母需要再确认，可以清楚地重读一次。` : `系统没能确认“${word}”的读音，可以靠近麦克风再试一次。`}</p><small>{feedback?.detail}</small></div>}
+        <p>{feedback?.kind === "partial" ? `“${word}”还没有拿到满星，可以再试一次；也可以请老师填写评语。` : feedback?.kind === "wrong" ? `“${word}”的读音可能不对，可以再读一次；如果孩子已经读对，请老师确认。` : feedback?.kind === "sound-review" ? `“${word}”的声母需要再确认，可以清楚地重读一次。` : `系统没能确认“${word}”的读音，可以靠近麦克风再试一次。`}</p><small>{feedback?.detail}</small></div>}
     </Dialog>
   </Card>;
 }

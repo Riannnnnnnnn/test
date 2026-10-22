@@ -39,7 +39,7 @@ try {
     check('字词局部声调问题保留部分星级且不冒充满分', speechDimensionStars(wordTone, 'pronunciationScore') === 5 && speechDimensionStars(wordTone, 'toneScore') === 4 && map(wordTone).scores.pronunciationClarity === 97 && map(wordTone).stars === 4);
     const syllableError = parse('<read_word total_score="100" phone_score="100" tone_score="100"><syll content="苹" perr_msg="1"><phone perr_msg="0"/></syll></read_word>');
     check('苹果首字音节层提示声韵错误时不能给满星', syllableError.issues.length === 1 && syllableError.issues[0].text === '苹' && syllableError.issues[0].kind === '声韵错误' && map(syllableError).stars === 4 && speechDimensionStars(syllableError, 'pronunciationScore') === 4);
-    check('听写识别为亭果且讯飞标出苹字错音时判错读', await countPronunciationRepetitions('亭果', '苹果') === 0 && await classifySpeechContent(syllableError, '亭果', '苹果') === 'mismatch');
+    check('声韵错音按声韵扣分，不因亭果转写清零', await classifySpeechContent(syllableError, '亭果', '苹果') === 'matched');
     const duplicateSoundError = parse('<read_word total_score="100" phone_score="100" tone_score="100"><syll content="苹" perr_msg="1"><phone perr_msg="1"/></syll></read_word>');
     check('音节与音素都提示同一错音时不重复扣分', duplicateSoundError.issues.length === 1 && map(duplicateSoundError).stars === 4);
     const copiedAlignment = parse('<read_word total_score="100" phone_score="100" tone_score="100"><syll content="苹" dp_message="128" perr_msg="128"/></read_word>');
@@ -47,25 +47,33 @@ try {
     const clearWord = parse('<read_word total_score="96" phone_score="96" tone_score="96"/>');
     const confidentApple = parse('<read_word total_score="100" phone_score="100" tone_score="100"><syll content="苹"><phone content="p" is_yun="0" perr_msg="0" perr_level_msg="1"/></syll></read_word>');
     const uncertainApple = parse('<read_word total_score="100" phone_score="100" tone_score="100"><syll content="苹"><phone content="p" is_yun="0" perr_msg="0" perr_level_msg="2"/></syll></read_word>');
+    const weakFinalApple = parse('<read_word total_score="100" phone_score="100" tone_score="100"><syll content="果"><phone content="uo" is_yun="1" perr_msg="0" perr_level_msg="2"/></syll></read_word>');
     const confidentStatus = await classifySpeechContent(confidentApple, '苹果', '苹果');
     const uncertainStatus = await classifySpeechContent(uncertainApple, '苹果', '苹果');
     check('声母高置信的苹果保留满星', confidentStatus === 'matched' && map({ ...confidentApple, contentStatus: confidentStatus }).stars === 5);
     check('声母置信不足即使听写和总分满分也不自动放行', uncertainStatus === 'uncertain' && map({ ...uncertainApple, contentStatus: uncertainStatus }).stars === 0);
+    check('韵母置信不足不自动满星，也不直接判孩子读错', await classifySpeechContent(weakFinalApple, '苹果', '苹果') === 'matched' && map(weakFinalApple).stars === 4 && speechDimensionStars(weakFinalApple, 'pronunciationScore') === 4);
+    check('99分不自动满星，99.5分才进入五星区间', map(parse('<read_word total_score="99" phone_score="99" tone_score="99"/>')).stars === 4 && map(parse('<read_word total_score="99.5" phone_score="99.5" tone_score="99.5"/>')).stars === 5);
     check('声母待复核提示明确且不断言孩子读错', getSpeechReviewFeedback({ ...uncertainApple, contentStatus: uncertainStatus }, '苹果')?.title === '声母需要再确认');
     const wrongWord = parse('<read_word total_score="96" phone_score="96" tone_score="96"><syll content="苹" dp_message="128"/></read_word>');
     check('文字与评测都吻合才确认读对', await classifySpeechContent(clearWord, '苹果', '苹果') === 'matched');
     check('同音字听写不阻断正确读音', await countPronunciationRepetitions('攻击', '公鸡') === 1 && await classifySpeechContent(clearWord, '攻击', '公鸡') === 'matched');
     check('同音字重复朗读仍可识别', await countPronunciationRepetitions('攻击攻击', '公鸡') === 2 && await classifySpeechContent(clearWord, '攻击攻击', '公鸡') === 'matched');
-    check('声调不同不当作同音词', await countPronunciationRepetitions('供给', '公鸡') === 0 && await classifySpeechContent(clearWord, '供给', '公鸡') === 'uncertain');
+    check('转写声调不同不改变声学评分', await classifySpeechContent(clearWord, '供给', '公鸡') === 'matched');
     check('同音字但评测指出错漏读不自动判正确', await classifySpeechContent(wrongWord, '攻击', '公鸡') === 'uncertain');
-    check('两路证据都指向错读才提示可能读错', await classifySpeechContent(wrongWord, '香蕉', '苹果') === 'mismatch');
-    check('只有听写不一致属于没听清', await classifySpeechContent(clearWord, '香蕉', '苹果') === 'uncertain');
+    check('目标音节替换仍需复核', await classifySpeechContent(wrongWord, '香蕉', '苹果') === 'uncertain');
+    check('转写不一致不否决声学评分', await classifySpeechContent(clearWord, '香蕉', '苹果') === 'matched');
     const wrongPronunciation = parse('<read_word total_score="84" phone_score="70" tone_score="90"><syll content="子"><phone dp_message="0" perr_msg="1"/></syll></read_word>');
-    check('包纸听写和声韵错误共同指向读错', await classifySpeechContent(wrongPronunciation, '包纸', '包子') === 'mismatch');
-    check('仅有声韵错误但听写为空仍不冤枉孩子', await classifySpeechContent(wrongPronunciation, '', '包子') === 'uncertain');
+    check('有声韵错误仍保留部分成绩', await classifySpeechContent(wrongPronunciation, '包纸', '包子') === 'matched');
+    check('声韵扣分不依赖听写', await classifySpeechContent(wrongPronunciation, '', '包子') === 'matched');
     check('两路证据冲突属于没听清', await classifySpeechContent(wrongWord, '苹果', '苹果') === 'uncertain');
-    check('空听写不判孩子读错', await classifySpeechContent(clearWord, '', '苹果') === 'uncertain');
+    check('无需听写也能评声韵声调', await classifySpeechContent(clearWord, '', '苹果') === 'matched');
+    for (const heard of ['飞飞机飞机', '嗯包飞机', 'The the', '']) {
+      check(`转写不参与发音判定：${heard}`, await classifySpeechContent(clearWord, heard, '飞机') === 'matched');
+    }
     const clearSentence = parse(sentence('accuracy_score="88" phone_score="82" tone_score="75" integrity_score="91"'));
+    const incompleteHighSentence = parse(sentence('accuracy_score="100" phone_score="100" tone_score="100"'));
+    check('句子缺少完整度时不自动满星', map(incompleteHighSentence).stars === 4);
     check('句子星级优先依据声韵和声调', map(clearSentence).scores.pronunciationClarity === 75);
     check('句子少量听写漏字仍使用可靠发音评测', await classifySpeechContent(clearSentence, '小松鼠坐在树下伸手摘山楂', '小松鼠坐在树下，伸手摘山楂。') === 'matched');
     check('句子听写服务无结果但评测可靠仍保留星级', await classifySpeechContent(clearSentence, '', '小松鼠坐在树下，伸手摘山楂。') === 'matched');
@@ -73,10 +81,10 @@ try {
     const incompleteSentence = parse(sentence('accuracy_score="88" phone_score="82" tone_score="75" integrity_score="35"'));
     check('句子完整度不足时不能用评测兜底', await classifySpeechContent(incompleteSentence, '', '小松鼠坐在树下，伸手摘山楂。') === 'uncertain');
     check('未录完整的句子提示具体原因而非笼统没听清', getSpeechReviewFeedback({ ...incompleteSentence, contentStatus: 'uncertain' }, '小松鼠坐在树下，伸手摘山楂。')?.title === '句子可能没录完整');
-    check('句子听写与评测冲突时展示听写参考', getSpeechReviewFeedback({ ...clearSentence, contentStatus: 'uncertain', transcript: '小松鼠坐在树下' }, '小松鼠坐在树下，伸手摘山楂。')?.message.includes('小松鼠坐在树下'));
+    check('句子不再显示听写参考', !getSpeechReviewFeedback({ ...clearSentence, contentStatus: 'uncertain', transcript: 'The the' }, '小松鼠坐在树下，伸手摘山楂。')?.message.includes('The the'));
     const repeated = parse('<read_word total_score="94" phone_score="94" tone_score="92"><syll content="苹" dp_message="64"/></read_word>');
     check('两遍或多遍完整目标词可识别', countReferenceRepetitions('苹果，苹果。', '苹果') === 2 && countReferenceRepetitions('苹果苹果苹果', '苹果') === 3 && await classifySpeechContent(repeated, '苹果苹果', '苹果') === 'matched');
-    check('重复中混入不同词不当作读对', await classifySpeechContent(repeated, '苹果香蕉', '苹果') === 'uncertain' && countReferenceRepetitions('苹果香蕉', '苹果') === 0);
+    check('增读回读保留声学成绩但不满星', await classifySpeechContent(repeated, '苹果香蕉', '苹果') === 'matched' && map({ ...repeated, contentStatus: 'matched' }).stars === 4);
     check('自我纠正不能把整段直接判为正确', await classifySpeechContent(wrongWord, '帽子包子', '包子') === 'uncertain');
     for (const raw of ['<broken>', '<read_sentence total_score="101"/>', '<read_sentence><sentence total_score="90"/></read_sentence>']) {
       let failed = false; try { parse(raw); } catch { failed = true; }

@@ -46,8 +46,7 @@
 .expr--sad .expr__figure { animation: expr-sink 3.4s ease-in-out infinite; }
 .expr--shy .expr__figure { animation: expr-sway 3.2s ease-in-out infinite; }
 .expr--angry .expr__figure { animation: expr-shake 2.6s ease-in-out infinite; }
-.expr.is-holding .expr__figure { animation-duration: .9s; }
-.expr.is-done .expr__figure { animation: expr-cheer .8s var(--m-spring, var(--pro-spring)) both; }
+.expr.is-holding .expr__figure, .expr.is-done .expr__figure { animation-play-state: paused; }
 
 /* 氛围小粒子：开心=星星上浮，难过=雨滴下落，害羞=爱心飘升，生气=气团冒起 */
 .expr__fx { position: absolute; z-index: 1; inset: 0; pointer-events: none; }
@@ -65,6 +64,11 @@
 .expr__word span { display: inline-block; transform-origin: 50% 80%; animation: m-char-in .62s calc(.14s + var(--i, 0) * .09s) var(--m-spring, var(--pro-spring)) both; }
 .expr__text { max-width: 14em; margin: 0; color: var(--pro-ink-2); font-size: clamp(18px, 2vw, 30px); line-height: 1.7; font-weight: 700; animation: pro-rise .5s .3s var(--pro-ease) both; }
 .expr__count { position: absolute; z-index: 5; inset: 0; display: grid; place-items: center; color: #fff; font-size: clamp(90px, 16vh, 170px); font-weight: 900; text-shadow: 0 6px 0 var(--mood), 0 12px 30px rgba(36, 16, 72, .35); background: rgba(36, 16, 72, .28); backdrop-filter: blur(2px); animation: expr-count .95s var(--pro-ease) both; }
+.expr__shutter { position: absolute; z-index: 7; inset: 0; overflow: hidden; pointer-events: none; }
+.expr__shutter i { position: absolute; left: 0; right: 0; height: 50%; background: #21133f; }
+.expr__shutter i:first-child { top: 0; animation: expr-shutter-top .55s ease-in-out both; }
+.expr__shutter i:nth-child(2) { bottom: 0; animation: expr-shutter-bottom .55s ease-in-out both; }
+.expr__shutter b { position: absolute; inset: 0; background: #fff; animation: expr-shutter-flash .55s ease-out both; }
 .expr__burst { position: absolute; z-index: 6; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
 .expr__burst i { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--c); opacity: 0; animation: m-burst .95s calc(.05s + var(--d, 0s)) var(--m-ease, var(--pro-ease)) both; }
 .expr__burst i:nth-child(3n) { width: 8px; height: 14px; border-radius: 2px; }
@@ -102,6 +106,9 @@
 @keyframes expr-drop { 0% { opacity: 0; transform: translateY(0) scale(var(--s)); } 15% { opacity: .85; } 100% { opacity: 0; transform: translateY(330px) scale(var(--s)); } }
 @keyframes expr-puff { 0% { opacity: 0; transform: translate3d(0, 0, 0) scale(.4); } 25% { opacity: .9; } 100% { opacity: 0; transform: translate3d(calc(var(--w) * 16px), -220px, 0) scale(1.8); } }
 @keyframes expr-count { 0% { opacity: 0; transform: scale(1.6); } 25% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(.85); } }
+@keyframes expr-shutter-top { 0%, 100% { transform: translateY(-100%); } 20%, 38% { transform: translateY(0); } }
+@keyframes expr-shutter-bottom { 0%, 100% { transform: translateY(100%); } 20%, 38% { transform: translateY(0); } }
+@keyframes expr-shutter-flash { 0%, 28%, 100% { opacity: 0; } 36% { opacity: .95; } 65% { opacity: 0; } }
 @keyframes expr-wave { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.45); } }
 @keyframes expr-nudge { 0%, 70%, 100% { transform: none; } 85% { transform: scale(1.06); } }
 @keyframes expr-fall { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: .8; } 100% { opacity: 0; transform: translateY(110vh); } }
