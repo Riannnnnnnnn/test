@@ -45,7 +45,7 @@ export function VoiceConsole({ state, level, timer, headline, hint, micLabel, mi
       <div className="vc__orb-wrap">
         <i className="vc__ripple" aria-hidden="true" /><i className="vc__ripple vc__ripple--2" aria-hidden="true" /><i className="vc__ripple vc__ripple--3" aria-hidden="true" />
         <span className="vc__spin" aria-hidden="true" />
-        <button type="button" className="vc__orb" disabled={busy || (listening && !onStop)} onClick={listening ? onStop : onStart} onPointerEnter={onPrepare} onPointerDown={onPrepare} onFocus={onPrepare} aria-label={micAria} title={micAria}>
+        <button type="button" className="vc__orb" disabled={busy || (listening && !onStop)} onClick={listening ? onStop : onStart} onPointerEnter={(event) => { if (event.pointerType === "mouse" && !listening && !busy) onPrepare?.(); }} aria-label={micAria} title={micAria}>
           {listening ? <span className="vc__eq" aria-hidden="true"><i /><i /><i /><i /></span> : state === "done" ? <ReplayIcon /> : <MicIcon />}
         </button>
       </div>

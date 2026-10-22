@@ -65,6 +65,11 @@ export class SmartEvaluationUnavailableError extends Error {}
 export class SpeechContentMismatchError extends Error {}
 
 const FRAME_BYTES = 1280;
+// 讯飞建议每 40ms 发送 1280B PCM，也允许调整单包大小（不超过 19200B）。
+// 连接晚于录音开始时，把积压的数帧合为一个小包，减少 WebSocket 消息数。
+const SEND_INTERVAL_MS = 40;
+const CATCH_UP_FRAMES = 4;
+const MAX_SOCKET_BUFFER_BYTES = 64 * 1024;
 
 export function normalizeSpeechText(value: string): string {
   return value.normalize("NFKC").replace(/[\s，。！？、,.!?；;：:“”'‘’（）()《》【】—-]/g, "");
@@ -304,6 +309,7 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
   let cancelled = false;
   let cleaned = false;
   let finishedSending = false;
+  let receivedResult = false;
   let sendTimer = 0;
   let firstIseFrame = true;
   let pendingBytes: number[] = [];
@@ -348,14 +354,19 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
   const pumpAudio = () => {
     if (!connected || cancelled || finishedSending) return;
     try {
-      // 网络慢、连接建立晚时，录音会在本地积压；积压较多时每次多发几帧追赶，
-      // 避免说完后还要按“真实时长”慢慢补传（整句尤其明显）。
-      const batch = audioFrames.length > 6 ? 4 : 1;
-      let sent = 0;
-      while (sent < batch && audioFrames.length) { sendAudio(audioFrames.shift()!); sent += 1; }
-      if (sent) return;
-      if (!stopped) return;
       if (!iseSocket || iseSocket.readyState !== WebSocket.OPEN) throw new Error("智能评分连接中断，请重新评测。");
+      // 浏览器尚未把上一个包送出时先等待，避免网络拥塞时无限堆在 WebSocket 内部。
+      if (iseSocket.bufferedAmount > MAX_SOCKET_BUFFER_BYTES) return;
+      if (audioFrames.length) {
+        const batch = audioFrames.length > 6 ? Math.min(CATCH_UP_FRAMES, audioFrames.length) : 1;
+        const frames = audioFrames.splice(0, batch);
+        const bytes = new Uint8Array(frames.reduce((total, frame) => total + frame.length, 0));
+        let offset = 0;
+        for (const frame of frames) { bytes.set(frame, offset); offset += frame.length; }
+        sendAudio(bytes);
+        return;
+      }
+      if (!stopped) return;
       finishedSending = true;
       window.clearInterval(sendTimer);
       iseSocket.send(JSON.stringify({ business: { cmd: "auw", aus: 4, aue: "raw" }, data: { status: 2, data: "", data_type: 1, encoding: "raw" } }));
@@ -374,6 +385,7 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
         return;
       }
       if (response.data?.status === 2 && response.data.data) {
+        receivedResult = true;
         resolveResult({ ...parseXfyunIseResult(decodeBase64Utf8(response.data.data), response.sid, category), requestParameters: business });
         iseSocket?.close(1000);
       }
@@ -408,6 +420,9 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
     iseSocket = new WebSocket(auth.url);
     iseSocket.onmessage = onIseMessage;
     iseSocket.onerror = () => fail(new Error("无法连接智能评测服务，请稍后重试。"));
+    iseSocket.onclose = () => {
+      if (!cancelled && !receivedResult) fail(new Error("智能评分连接中断，请重新评测。"));
+    };
     await waitForSocket(iseSocket, "智能评测服务", () => {
         iseSocket?.send(JSON.stringify({
           common: { app_id: auth?.appId },
@@ -418,7 +433,7 @@ export async function startXfyunIse({ referenceText, category = "read_word", stu
     if (cancelled) return;
     connected = true;
     pumpAudio();
-    if (!finishedSending) sendTimer = window.setInterval(pumpAudio, 40);
+    if (!finishedSending) sendTimer = window.setInterval(pumpAudio, SEND_INTERVAL_MS);
   }).catch((reason: unknown) => {
     const error = reason instanceof Error ? reason : new Error("语音服务连接失败，请重新评测。");
     fail(error);

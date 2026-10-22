@@ -101,8 +101,7 @@ export function Pronunciation({ onResultChange, result, stage, studentGrade, ite
       const reason = evaluation.reviewReasons?.find((item) => /噪声|音量|截幅|音频输入|拒评|缺少准确度/.test(item));
       const weakInitial = evaluation.contentStatus === "uncertain" ? evaluation.initialConfidenceWarnings?.[0] : undefined;
       const detail = weakInitial ? `“${weakInitial.text}”的声母${weakInitial.sound ? `“${weakInitial.sound}”` : ""}暂时无法确认；这不代表孩子一定读错。请再读一次或请老师听录音确认。` : reason ? `评测提示：${reason}。`
-        : matched ? "本次依据声韵和声调评分。请听老师示范，再练习目标字音。"
-          : "尚未获得完整、可靠的目标字音信息，请再读一次或请老师确认。";
+        : matched ? "本次依据声韵和声调评分。请听老师示范，再练习目标字音。" : undefined;
       setReasonStep(false); setIssueIds([]);
       setFeedback({ kind: full ? "full" : matched && stars > 0 ? "partial" : evaluation.contentStatus === "mismatch" ? "wrong" : weakInitial ? "sound-review" : "uncertain", stars, nextId: next?.id, detail });
       playStarsSound(stars);
@@ -127,7 +126,7 @@ export function Pronunciation({ onResultChange, result, stage, studentGrade, ite
       </div>
     </div>
     <div className="pron__console"><SmartSpeechEvaluator ref={evaluatorRef} studentGrade={studentGrade} evidence={result.rawResult?.evidence as XfyunIseResult | undefined} featured strictRating sentence={stage === "B"} referenceText={word} initialScore={result.autoScores?.pronunciationClarity} initialPreview={result.rawResult?.provider === "smart-preview"} dimensionRatings={result.autoScores} onReset={resetEvaluation} onEvaluated={saveEvaluation} /></div>
-    <Dialog open={Boolean(feedback)} className={reasonStep ? "dialog-backdrop--pron-skip" : undefined} title={reasonStep ? "孩子哪里还可以更好？" : feedback?.kind === "full" ? "读对啦！" : feedback?.kind === "partial" ? `${feedback.stars} 颗星，再努力一下` : feedback?.kind === "wrong" ? "读音可能不对" : feedback?.kind === "sound-review" ? "声母需要再确认" : "这次没听清"} onClose={closeFeedback}
+    <Dialog open={Boolean(feedback)} className={reasonStep ? "dialog-backdrop--pron-skip" : undefined} title={reasonStep ? "孩子哪里还可以更好？" : feedback?.kind === "full" ? "读对啦！" : feedback?.kind === "partial" ? `${feedback.stars} 颗星，再努力一下` : feedback?.kind === "sound-review" ? "声母需要再确认" : "这次没听清"} onClose={closeFeedback}
       footer={<div className="dialog-actions">{reasonStep
         ? <><Button variant="secondary" onClick={() => setReasonStep(false)}>返回</Button><Button disabled={!canConfirmSkip} onClick={() => void confirmSkip()}>确认，下一个字</Button></>
         : feedback?.kind === "full"
@@ -142,7 +141,7 @@ export function Pronunciation({ onResultChange, result, stage, studentGrade, ite
         <small className="skip-reasons__tip">{canConfirmSkip ? `已选 ${issueIds.length} 项` : "请至少选择一项"}</small></div>
       : feedback?.kind === "full" ? <div className="pron-result pron-result--correct"><span className="pron-burst" aria-hidden="true">{BURST.map((item, index) => <i key={index} style={item} />)}</span><span className="pron-result__badge">✨ 闯关成功</span><p><b>“{word}”</b>读得真棒！</p><div className="pron-result__star-card"><span>本题点亮</span><span className="pron-result__stars" aria-label="5颗星"><StarRating value={5} /></span><strong>5 / 5 星</strong></div>{feedback.nextId && <div className="pron-result__timer" aria-hidden="true"><i style={{ animationDuration: `${AUTO_ADVANCE_MS}ms` }} /></div>}<small>{feedback.nextId ? (stage === "B" ? "马上自动进入下一句 →" : "马上自动进入下一个字 →") : "本组题目已完成，真了不起！"}</small></div>
       : <div className="pron-result__hint"><div className="pron-result pron-result--retry"><div className="pron-result__star-card pron-result__star-card--soft"><span className="pron-result__stars" aria-label={`${feedback?.stars ?? 0}颗星`}><StarRating value={feedback?.stars ?? 0} inactiveGradient /></span><strong>{feedback?.stars ?? 0} / 5 星</strong></div></div>
-        <p>{feedback?.kind === "partial" ? `“${word}”还没有拿到满星，可以再试一次；也可以请老师填写评语。` : feedback?.kind === "wrong" ? `“${word}”的读音可能不对，可以再读一次；如果孩子已经读对，请老师确认。` : feedback?.kind === "sound-review" ? `“${word}”的声母需要再确认，可以清楚地重读一次。` : `系统没能确认“${word}”的读音，可以靠近麦克风再试一次。`}</p><small>{feedback?.detail}</small></div>}
+        <p>{feedback?.kind === "partial" ? `“${word}”还没有拿到满星，可以再试一次；也可以请老师填写评语。` : feedback?.kind === "sound-review" ? `“${word}”的声母需要再确认，可以清楚地重读一次。` : `系统没能识别到“${word}”，可以靠近麦克风再试一次。`}</p>{feedback?.detail && <small>{feedback.detail}</small>}</div>}
     </Dialog>
   </Card>;
 }

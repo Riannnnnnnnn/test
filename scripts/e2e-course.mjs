@@ -317,6 +317,7 @@ try {
     const packets = [];
     const originalFetch = window.fetch;
     const originalWebSocket = window.WebSocket;
+    const originalPermissionQuery = navigator.permissions.query.bind(navigator.permissions);
     window.fetch = (input, init) => String(input).includes('/api/xfyun/ise-auth')
       ? Promise.resolve(new Response(JSON.stringify({ appId: 'test', url: 'wss://test/ise', iatUrl: 'wss://test/iat' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       : originalFetch(input, init);
@@ -327,11 +328,19 @@ try {
         super(); this.url = url;
         setTimeout(() => { this.readyState = 1; this.dispatchEvent(new Event('open')); }, 1600);
       }
-      send(value) { packets.push({ url: this.url, value: JSON.parse(value) }); }
+      send(value) {
+        const packet = JSON.parse(value);
+        packets.push({ url: this.url, value: packet });
+        if (packet.data?.status === 2) setTimeout(() => { this.readyState = 3; const event = new Event('close'); this.onclose?.(event); this.dispatchEvent(event); }, 10);
+      }
       close() { this.readyState = 3; }
     }
     window.WebSocket = SlowWebSocket;
     try {
+      // 预热权限查询很慢时，真实点击不能等它结束才开始收音。
+      navigator.permissions.query = () => new Promise((resolve) => setTimeout(() => resolve({ state: 'granted' }), 1800));
+      const { warmMicrophone } = await import('/src/services/audio/microphone.ts');
+      void warmMicrophone();
       const { startXfyunIse } = await import('/src/services/speech/xfyunIse.ts');
       let volumeUpdates = 0;
       const start = performance.now();
@@ -343,17 +352,24 @@ try {
       await new Promise((resolve) => setTimeout(resolve, 120));
       const iseReceivedAudio = packets.some((packet) => packet.url.endsWith('/ise') && packet.value.business?.cmd === 'auw');
       const iatConnected = packets.some((packet) => packet.url.endsWith('/iat'));
-      session.cancel();
-      return { captureDelay, capturedBeforeConnection, iseReceivedAudio, iatConnected };
+      const catchUpPacketBytes = Math.max(...packets.filter((packet) => packet.value.data?.status === 1).map((packet) => atob(packet.value.data.data).length));
+      const stopStart = performance.now();
+      const stoppedError = await session.stop().then(() => '', (error) => error.message);
+      const stopDelay = performance.now() - stopStart;
+      return { captureDelay, capturedBeforeConnection, iseReceivedAudio, iatConnected, catchUpPacketBytes, stopDelay, stoppedError };
     } finally {
       window.fetch = originalFetch;
       window.WebSocket = originalWebSocket;
+      navigator.permissions.query = originalPermissionQuery;
     }
   });
   assert(startup.captureDelay < 1200, `麦克风启动耗时 ${startup.captureDelay.toFixed(0)}ms`);
   assert(startup.capturedBeforeConnection, '连接期间应已开始本地收音');
   assert(startup.iseReceivedAudio, '评测服务应收到暂存音频');
   assert.equal(startup.iatConnected, false, '纯中文发音评测不启动通用听写');
+  assert(startup.catchUpPacketBytes > 1280 && startup.catchUpPacketBytes <= 5120, '积压音频应合并为安全大小的小包');
+  assert(startup.stopDelay < 3000, `连接提前关闭应立即退出，而非等待 15 秒：${startup.stopDelay.toFixed(0)}ms`);
+  assert.match(startup.stoppedError, /连接中断/);
   await latencyPage.close();
   console.log('PASS 点击后先收音，慢速语音连接建立后补发开头音频');
   const popupPage = await context.newPage();
@@ -413,6 +429,8 @@ try {
   await popupPage.getByRole('button', { name: '开始智能评测' }).click();
   await popupPage.locator('.vc--listening').waitFor();
   await popupPage.evaluate(() => { globalThis.testMicrophoneGain.gain.value = .24; setTimeout(() => { globalThis.testMicrophoneGain.gain.value = 0; }, 850); });
+  await popupPage.waitForTimeout(950);
+  await popupPage.getByRole('button', { name: '结束朗读并开始评测' }).click();
   await resultDialog.waitFor({ timeout: 12000 });
   assert.match(await resultDialog.innerText(), /哥哥.*5 \/ 5 星/s);
   await popupPage.getByRole('button', { name: /^声母 b：爸爸/ }).click();
@@ -459,7 +477,7 @@ try {
   const uncertainDialog = popupPage.getByRole('dialog', { name: '这次没听清' });
   await uncertainDialog.waitFor({ timeout: 12000 });
   assert.doesNotMatch(await uncertainDialog.innerText(), /语音听写|The the|流奶/);
-  assert.match(await uncertainDialog.innerText(), /目标字音/);
+  assert.match(await uncertainDialog.innerText(), /系统没能识别到“爸爸”，可以靠近麦克风再试一次/);
   await popupPage.evaluate(() => { globalThis.fakeSpeechKind = 'correct'; });
   await uncertainDialog.getByRole('button', { name: '再试一次' }).click();
   await popupPage.locator('.vc--listening').waitFor();

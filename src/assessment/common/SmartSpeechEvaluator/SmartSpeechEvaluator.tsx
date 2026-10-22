@@ -202,10 +202,10 @@ export const SmartSpeechEvaluator = forwardRef<SmartSpeechEvaluatorHandle, Smart
   const reviewFeedback = finalEvidence ? getSpeechReviewFeedback(finalEvidence, referenceText) : undefined;
   const needsReview = isDone && reviewFeedback !== undefined && reviewFeedback.kind !== "pronunciation";
   const hasPronunciationAdvice = isDone && reviewFeedback?.kind === "pronunciation";
-  const micLabel = isListening ? sentence ? "读完点此结束" : "正在识别" : isBusy ? "请稍候" : isDone ? "再测一次" : "点击说话";
-  const micAria = isListening ? sentence ? "结束朗读并开始评测" : "正在自动识别" : isBusy ? "正在处理语音" : isDone ? "重新智能评测" : "开始智能评测";
+  const micLabel = isListening ? "读完点此结束" : isBusy ? "请稍候" : isDone ? "再测一次" : "点击说话";
+  const micAria = isListening ? "结束朗读并开始评测" : isBusy ? "正在处理语音" : isDone ? "重新智能评测" : "开始智能评测";
   const headline = isListening ? "正在听你说话" : state === "connecting" ? "正在准备收音" : state === "processing" ? "正在分析声音" : needsReview || hasPronunciationAdvice ? reviewFeedback?.title : isDone ? "本次表达观察" : state === "error" ? "没有听清，再来一次" : "准备好就说出来";
-  const hint = isPreview ? "智能服务未就绪，请使用教师评价" : isListening ? networkReady ? sentence ? "请把整句话读完，再点麦克风结束；停顿后也会自动结束" : "说完后停顿一下，系统会自动结束" : "已开始收音，正在连接评测服务" : state === "connecting" ? "正在打开麦克风" : state === "processing" ? "正在生成评分" : needsReview ? "未生成自动星级，可重测或请老师评价" : hasPronunciationAdvice ? "已显示分项星级，请老师结合实际发音评价" : isDone ? "评测完成" : "";
+  const hint = isPreview ? "智能服务未就绪，请使用教师评价" : isListening ? networkReady ? sentence ? "请把整句话读完，再点麦克风结束；停顿后也会自动结束" : "读完整个词后可点麦克风立即结束；停顿后也会自动结束" : "已开始收音，正在连接评测服务" : state === "connecting" ? "正在打开麦克风" : state === "processing" ? "正在生成评分" : needsReview ? "未生成自动星级，可重测或请老师评价" : hasPronunciationAdvice ? "已显示分项星级，请老师结合实际发音评价" : isDone ? "评测完成" : "";
   const dimensionItems: VoiceDimension[] = dimensions.map(({ key, label }) => {
     const dimensionKey = key as "pronunciationScore" | "toneScore";
     const score = finalEvidence ? finalEvidence[dimensionKey] : dimensionRatings?.[key];
@@ -221,7 +221,7 @@ export const SmartSpeechEvaluator = forwardRef<SmartSpeechEvaluatorHandle, Smart
     dimensionItems.push({ key: "wordMatch", label: "字音评测", done: matched, stars: 0, statusText: matched ? "已评测" : review ? "待确认" : "待检测", statusTone: matched ? "success" : review ? "review" : "pending" });
   }
 
-  return <VoiceConsole state={needsReview ? "error" : state} level={volume} timer={formatTime(seconds)} headline={headline} hint={hint} micLabel={micLabel} micAria={micAria} onStart={start} onStop={sentence ? () => { if (listening.current && !autoFinishing.current) { autoFinishing.current = true; void finish(); } } : undefined} onPrepare={() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }} dimensions={dimensionItems} dimensionsAria={sentence ? "三个维度的智能评星" : "声韵、声调和字音评测结果"}>
+  return <VoiceConsole state={needsReview ? "error" : state} level={volume} timer={formatTime(seconds)} headline={headline} hint={hint} micLabel={micLabel} micAria={micAria} onStart={start} onStop={() => { if (listening.current && !autoFinishing.current) { autoFinishing.current = true; void finish(); } }} onPrepare={() => { void prepareSpeechAuth().catch(() => undefined); void warmMicrophone(); }} dimensions={dimensionItems} dimensionsAria={sentence ? "三个维度的智能评星" : "声韵、声调和字音评测结果"}>
     {isDone && reviewFeedback && <div className={`vc__review vc__review--${reviewFeedback.kind}`} role="alert"><span className="vc__review-mark" aria-hidden="true">{reviewFeedback.kind === "reading" ? "×" : "!"}</span><strong>{reviewFeedback.title}</strong><span>{reviewFeedback.message}</span></div>}
     {error && <div className={`vc__error ${errorKind === "mismatch" ? "vc__error--mismatch" : ""}`} role="alert">
       <button type="button" className="vc__error-retry" onClick={start} aria-label="重新评测" title="重新评测"><img src="/assets/icons/refresh.svg" alt="" /><strong>{errorKind === "mismatch" ? "再试一次" : "重新评测"}</strong></button>

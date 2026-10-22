@@ -6,6 +6,7 @@ export const microphoneConstraints: MediaStreamConstraints = {
 const IDLE_RELEASE_MS = 15_000;
 let pooled: MediaStream | undefined;
 let warming: Promise<void> | undefined;
+let warmingStreamRequest = false;
 let idleTimer = 0;
 let generation = 0;
 
@@ -31,11 +32,13 @@ export async function acquireMicrophone(): Promise<MediaStream> {
   window.clearTimeout(idleTimer);
   const ready = takePooled();
   if (ready) return ready;
-  if (warming) {
+  // 点击开始时不等待仅用于预热的权限查询；若设备请求已发出则复用它。
+  if (warming && warmingStreamRequest) {
     await warming;
     const warmed = takePooled();
     if (warmed) return warmed;
   }
+  generation += 1;
   return navigator.mediaDevices.getUserMedia(microphoneConstraints);
 }
 
@@ -60,10 +63,11 @@ export function warmMicrophone(): Promise<void> {
     if (!navigator.mediaDevices?.getUserMedia || !navigator.permissions?.query) return;
     const permission = await navigator.permissions.query({ name: "microphone" as PermissionName });
     if (permission.state !== "granted" || currentGeneration !== generation) return;
+    warmingStreamRequest = true;
     const stream = await navigator.mediaDevices.getUserMedia(microphoneConstraints);
     if (currentGeneration !== generation) stop(stream);
     else releaseMicrophone(stream);
-  })().catch(() => undefined).finally(() => { warming = undefined; });
+  })().catch(() => undefined).finally(() => { warmingStreamRequest = false; warming = undefined; });
   return warming;
 }
 
