@@ -5,8 +5,10 @@ import { useSiteContent } from "@/content/useSiteContent";
 import { Card } from "@/components/ui";
 import type { AssessmentModuleProps } from "@/assessment/types";
 import { getCourseTasks, getCourseTaskImage, type CourseTask } from "@/config/courseTasks";
+import { expressionReviewLabels, expressionReviewOptions, isExpressionReviewed } from "@/config/expressionReviews";
+import { ForestBroadcast } from "./ForestBroadcast";
 
-/** 表情模仿只做“看图—跟做—保持”的陪伴式演示，不录音、不改动评分数据；星级仍由老师在底部评分。 */
+/** 计时不判断模仿质量；逐个保存老师的观察后才进入下一表情。 */
 const COUNTDOWN_SECONDS = 3;
 const HOLD_MS = 3000;
 // 素材约 1.46 秒；最后一声快门在 1.04 秒左右，闪光对准这一声。
@@ -38,16 +40,8 @@ const BURST = Array.from({ length: 16 }, (_, index) => {
   const radius = 130 + (index % 3) * 36;
   return { "--x": `${Math.round(Math.cos(angle) * radius)}px`, "--y": `${Math.round(Math.sin(angle) * radius * .8)}px`, "--c": CONFETTI_COLORS[index % 5], "--d": `${(index % 4) * .04}s`, "--r": `${index % 2 ? 220 : -220}deg` } as CSSProperties;
 });
-const RAIN = Array.from({ length: 16 }, (_, index) => ({ "--l": `${(index * 29 + 5) % 94 + 3}%`, "--d": `${(index % 7) * -.45}s`, "--t": `${1.5 + (index % 4) * .35}s` } as CSSProperties));
 
-function SmileIcon() {
-  return <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.2" /><path d="M8.2 14.2c1 1.6 2.3 2.4 3.8 2.4s2.8-.8 3.8-2.4" /><path d="M9 9.6v.6M15 9.6v.6" strokeWidth="2.8" /></svg>;
-}
-function ReplayIcon() {
-  return <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9" /><path d="M20 4.5v4.2h-4.2" /></svg>;
-}
-
-function EmotionStage({ tasks, selected, studentGender, onSelectItem }: { tasks: CourseTask[]; selected: CourseTask; studentGender?: string; onSelectItem?: (id: string) => void | Promise<void> }) {
+function EmotionStage({ tasks, selected, studentGender, onSelectItem, items, result, onResultChange }: Pick<AssessmentModuleProps, "studentGender" | "onSelectItem" | "items" | "result" | "onResultChange"> & { tasks: CourseTask[]; selected: CourseTask }) {
   const mood = moodOf(selected.id) ?? "happy";
   const palette = MOODS[mood];
   const image = getCourseTaskImage(selected, studentGender);
@@ -55,7 +49,13 @@ function EmotionStage({ tasks, selected, studentGender, onSelectItem }: { tasks:
   const [phase, setPhase] = useState<Phase>("idle");
   const [count, setCount] = useState(COUNTDOWN_SECONDS);
   const [held, setHeld] = useState(0);
-  const [finished, setFinished] = useState<string[]>([]);
+  const finished = tasks.filter((task) => isExpressionReviewed(items?.[task.id])).map((task) => task.id);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [choices, setChoices] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const reviewDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => { if (reviewOpen) reviewDialog.current?.showModal(); else reviewDialog.current?.close(); }, [reviewOpen]);
   const timer = useRef(0);
   const soundContext = useRef<AudioContext | null>(null);
   const shutterBuffer = useRef<AudioBuffer | null>(null);
@@ -150,8 +150,9 @@ function EmotionStage({ tasks, selected, studentGender, onSelectItem }: { tasks:
       if (holding < HOLD_MS) {
         setPhase("holding"); setHeld(holding / HOLD_MS); return;
       }
-      stop(); playFinishCue(); setHeld(1); setPhase("done");
-      setFinished((current) => current.includes(selected.id) ? current : [...current, selected.id]);
+      stop(); playFinishCue(); setHeld(1);
+      // 完成提示音约 0.57 秒；响完才开放“完成”。
+      timer.current = window.setTimeout(() => setPhase("done"), 600);
     }, TICK_MS);
   };
   const cancel = () => { stop(); stopSounds(); shutterStartedAt.current = null; setPhase("idle"); setCount(COUNTDOWN_SECONDS); setHeld(0); };
@@ -161,17 +162,29 @@ function EmotionStage({ tasks, selected, studentGender, onSelectItem }: { tasks:
   const doneCount = finished.length;
   const secondsLeft = Math.max(0, Math.ceil(HOLD_MS / 1000 * (1 - held)));
 
-  const headline = phase === "counting" ? `${count} 秒后开始，准备好` : phase === "preparing" ? "准备拍照，做好表情！" : phase === "holding" ? "保持住，别动！" : phase === "done" ? "跟做完成，请老师评价" : "准备好就做出来";
-  const hint = phase === "idle" ? "点按钮，跟着图片做表情" : phase === "counting" ? "看着屏幕，慢慢做出表情" : phase === "preparing" ? "听到咔嚓声，就保持表情" : phase === "holding" ? "快门已拍下，表情保持 3 秒" : next ? "可以进入下一个表情，或再来一次" : "四种表情都完成啦";
-  const chip = phase === "idle" ? "待机" : phase === "counting" ? "倒计时" : phase === "preparing" ? "准备拍照" : phase === "holding" ? "保持中" : "已完成";
+  const headline = phase === "counting" ? `${count} 秒后开始，准备好` : phase === "preparing" ? "准备拍照，做好表情！" : phase === "holding" ? "保持住，别动！" : phase === "done" ? "跟做完成，请老师评价" : "";
+  const running = phase === "counting" || phase === "preparing" || phase === "holding";
+  const firstPending = tasks.find((task) => !finished.includes(task.id));
+  const openReview = () => { setChoices(expressionReviewLabels(result)); setSaveError(""); setReviewOpen(true); };
+  const saveReview = async () => {
+    if (saving || !choices.length) return;
+    setSaving(true); setSaveError("");
+    try {
+      await onResultChange({ status: "completed", duration: 3, endTime: new Date().toISOString(),
+        rawResult: { ...result.rawResult, expressionReview: { labels: choices, reviewedAt: new Date().toISOString() } } });
+      setReviewOpen(false);
+      if (next) await onSelectItem?.(next.id);
+    } catch { setSaveError("评价暂未保存成功，请再试一次。"); }
+    finally { setSaving(false); }
+  };
   const style = { "--mood": palette.color, "--mood-soft": palette.soft, "--mood-deep": palette.deep, "--held": held } as CSSProperties;
 
-  return <Card className={`pro-card expr expr--${mood} is-${phase}`} style={style}>
+  return <Card className={`pro-card expr expr--review expr--${mood} is-${phase}`} style={style}>
     <aside className="expr__picker">
       <div className="course-task-picker">
         <p><span className="course-task-picker__title">表情</span>
           <span className="course-task-picker__meter" aria-hidden="true"><i style={{ width: `${tasks.length ? doneCount / tasks.length * 100 : 0}%` }} /></span>
-          <small>已模仿 <b>{doneCount}</b> / {tasks.length}</small></p>
+          <small>已评价 <b>{doneCount}</b> / {tasks.length}</small></p>
       </div>
       <div className="expr__moods" role="group" aria-label="选择表情">
         {tasks.map((task) => {
@@ -179,6 +192,7 @@ function EmotionStage({ tasks, selected, studentGender, onSelectItem }: { tasks:
           const thumb = getCourseTaskImage(task, studentGender);
           const isDone = finished.includes(task.id);
           return <button type="button" key={task.id} className={`expr__mood expr__mood--${key} ${task.id === selected.id ? "is-selected" : ""} ${isDone ? "is-done" : ""}`} aria-pressed={task.id === selected.id} aria-label={`${task.title}${isDone ? "，已模仿" : ""}`}
+            disabled={running || saving || (!isDone && task.id !== firstPending?.id)}
             style={{ "--mood": MOODS[key].color, "--mood-soft": MOODS[key].soft, "--mood-deep": MOODS[key].deep } as CSSProperties} onClick={() => onSelectItem?.(task.id)}>
             <span className="expr__thumb">{thumb && <img src={thumb} alt="" />}</span>
             <b>{task.title}</b>
@@ -198,62 +212,40 @@ function EmotionStage({ tasks, selected, studentGender, onSelectItem }: { tasks:
         {phase === "holding" && <span className="expr__shutter" aria-hidden="true"><i /><i /><b /></span>}
         {phase === "done" && <span className="expr__burst" aria-hidden="true">{BURST.map((item, i) => <i key={i} style={item} />)}</span>}
       </div>
-      <div className="expr__copy">
-        <span className="pron__tag expr__tag"><em>表情模仿 · 第 {index + 1} 个</em></span>
-        <strong className="expr__word" aria-label={selected.title}>{Array.from(selected.title).map((char, i) => <span key={i} style={{ "--i": i } as CSSProperties}>{char}</span>)}</strong>
-        <p className="expr__text">{selected.text}</p>
+      <div className="expr__actions">
+        {phase !== "idle" && <p role="status">{headline}{phase === "holding" && held < 1 ? `（${secondsLeft} 秒）` : ""}</p>}
+        {running ? <button className="pro-btn pro-btn--ghost" onClick={cancel}>取消跟做</button> : <>
+          <button className="pro-btn pro-btn--primary" aria-label="开始跟做表情" onClick={start}>{phase === "done" ? "再做一次" : "开始跟做"}</button>
+          {(phase === "done" || finished.includes(selected.id)) && <button className="pro-btn pro-btn--primary" onClick={openReview}>{phase === "done" ? "完成" : "查看评价"}</button>}
+        </>}
       </div>
     </section>
 
-    <div className={`vc expr__console vc--${phase === "counting" || phase === "preparing" ? "connecting" : phase === "holding" ? "listening" : phase}`}>
-      <div className="vc__mic">
-        <div className="vc__orb-wrap">
-          <i className="vc__ripple" aria-hidden="true" /><i className="vc__ripple vc__ripple--2" aria-hidden="true" /><i className="vc__ripple vc__ripple--3" aria-hidden="true" />
-          <button type="button" className="vc__orb expr__orb" onClick={phase === "counting" || phase === "preparing" || phase === "holding" ? cancel : start} aria-label={phase === "idle" ? "开始跟做表情" : phase === "done" ? "再做一次" : "停止"}>
-            {phase === "counting" ? <b className="expr__orb-num">{count}</b> : phase === "holding" ? <b className="expr__orb-num">{secondsLeft}</b> : phase === "done" ? <ReplayIcon /> : <SmileIcon />}
-          </button>
-        </div>
-        <span className="vc__mic-label">{phase === "idle" ? "开始跟做" : phase === "done" ? "再来一次" : "点此取消"}</span>
+    <dialog ref={reviewDialog} className="expr-review-dialog" onCancel={(event) => { event.preventDefault(); if (!saving) setReviewOpen(false); }}>
+      <h2>老师评价：{selected.title}</h2>
+      <p>请选择孩子的表现，可多选。</p>
+      <div className="expr-review-options">
+        {(expressionReviewOptions[selected.id] ?? []).map((label) => <label key={label}>
+          <input type="checkbox" checked={choices.includes(label)} disabled={saving} onChange={() => setChoices((current) => current.includes(label) ? current.filter((value) => value !== label) : [...current, label])} />
+          <span>{label}</span>
+        </label>)}
       </div>
-      <div className="vc__main" aria-live="polite">
-        <div className="vc__status">
-          <span className="vc__chip"><i aria-hidden="true" />{chip}</span>
-          <strong className="vc__headline">{headline}</strong>
-          <time className="vc__timer">{phase === "holding" ? `${(held * HOLD_MS / 1000).toFixed(1)}s` : phase === "done" ? "3.0s" : "0.0s"}</time>
-        </div>
-        <div className="expr__scope" aria-hidden="true">{Array.from({ length: 10 }, (_, i) => <i key={i} className={held * 10 > i || phase === "done" ? "is-on" : ""} />)}</div>
-        <small className="vc__hint">{hint}</small>
+      {saveError && <p role="alert">{saveError}</p>}
+      <div className="expr__actions">
+        <button className="pro-btn pro-btn--ghost" disabled={saving} onClick={() => setReviewOpen(false)}>返回</button>
+        <button className="pro-btn pro-btn--primary" disabled={saving || choices.length === 0} onClick={() => void saveReview()}>{saving ? "保存中…" : next ? "保存评价，下一个表情" : "保存评价"}</button>
       </div>
-      <button type="button" className="pro-btn pro-btn--primary expr__next" disabled={phase !== "done" || !next} onClick={() => next && void onSelectItem?.(next.id)}>
-        下一个表情
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-      </button>
-    </div>
+    </dialog>
   </Card>;
 }
 
-/** 大阶段“森林广播员”：同一套舞台语言，背景下起小雨，雨停转晴。 */
-function ScenarioStage({ selected }: { selected: CourseTask }) {
-  return <Card className="pro-card expr expr--scenario">
-    <section className="expr__stage expr__stage--scenario" key={`stage-${selected.id}`}>
-      <span className="expr__rain" aria-hidden="true">{RAIN.map((item, i) => <i key={i} style={item} />)}</span>
-      <span className="expr__sun" aria-hidden="true" />
-      <div className="expr__copy">
-        <span className="pron__tag expr__tag"><em>情境表演</em></span>
-        <strong className="expr__word expr__word--scenario">{selected.title}</strong>
-        <p className="expr__text expr__text--scenario">{selected.text}</p>
-      </div>
-    </section>
-  </Card>;
-}
 
-export function AnimalImitation({ stage, studentGender, result, items, onSelectItem }: AssessmentModuleProps) {
+export function AnimalImitation({ stage, studentGender, result, items, onSelectItem, onResultChange }: AssessmentModuleProps) {
   const { content } = useSiteContent();
   const module = content.modules.A5;
   const tasks = (stage ? getCourseTasks(stage, "A5") : []).map((item) => ({ ...item, ...content.taskOverrides?.[item.id] }));
-  void items;
   const selected = tasks.find((item) => item.id === result.questionId);
-  if (selected) return stage === "B" ? <ScenarioStage selected={selected} /> : <EmotionStage tasks={tasks} selected={selected} studentGender={studentGender} onSelectItem={onSelectItem} />;
+  if (selected) return stage === "B" ? <ForestBroadcast selected={selected} result={result} onResultChange={onResultChange} /> : <EmotionStage tasks={tasks} selected={selected} studentGender={studentGender} onSelectItem={onSelectItem} items={items} result={result} onResultChange={onResultChange} />;
   const visual = module.imageUrl ? <div className="module-uploaded-image"><img src={module.imageUrl} alt={module.imageAlt} /></div> : <div className="picture-placeholder picture-placeholder--tiger"><span className="tiger-ear tiger-ear--left" /><span className="tiger-ear tiger-ear--right" />{module.visualText}</div>;
   return <ModuleShell className="module-card--character module-card--animal" visualClassName="module-card__visual--character" eyebrow={module.eyebrow} title={module.title} prompt={module.prompt} visual={visual}>{module.teacherNote && <p className="task-note">{module.teacherNote}</p>}</ModuleShell>;
 }

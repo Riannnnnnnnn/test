@@ -12,6 +12,7 @@ import { getStageAQuestion } from "@/data/questionBank";
 import type { AudioRecording } from "@/services/audio";
 import { averageScoreRecords, mergeFinalScores } from "@/services/scoring";
 import { getCourseTasks, getCourseTaskImage } from "@/config/courseTasks";
+import { isExpressionReviewed } from "@/config/expressionReviews";
 import type { AssessmentResult } from "@/types";
 import { getSession, getStudent, saveAudio, saveSession } from "@/services/storage";
 import { useAssessmentStore } from "@/stores/assessmentStore";
@@ -31,7 +32,7 @@ export function AssessmentPage() {
   const student = useAssessmentStore((state) => state.student);
   const setSession = useAssessmentStore((state) => state.setSession);
   const setStudent = useAssessmentStore((state) => state.setStudent);
-  const [loading, setLoading] = useState(!session);
+  const [loading, setLoading] = useState(session?.id !== sessionId);
   const [scoringOpen, setScoringOpen] = useState(false);
   const [attemptRevision, setAttemptRevision] = useState(0);
   const [manualGuide, setManualGuide] = useState(false);
@@ -79,7 +80,7 @@ export function AssessmentPage() {
   }
 
   if (loading) return <div className="app-shell"><PageContainer><p className="loading-state">正在恢复评测进度…</p></PageContainer></div>;
-  if (!session) return <div className="app-shell"><PageContainer><Card><h1>评测记录不存在</h1><Button onClick={() => navigate("/profile")}>开始新评测</Button></Card></PageContainer></div>;
+  if (!session || session.id !== sessionId) return <div className="app-shell"><PageContainer><Card><h1>评测记录不存在</h1><Button onClick={() => navigate("/profile")}>开始新评测</Button></Card></PageContainer></div>;
 
   const activeSession = session;
   const modules = activeSession.courseVersion === 3 ? stageConfigs[activeSession.stage].moduleIds : activeSession.results.map((result) => result.moduleId);
@@ -89,6 +90,8 @@ export function AssessmentPage() {
   const activeResult = activeSession.results.find((result) => result.moduleId === moduleId) ?? { moduleId, questionId: `${moduleId}-001`, status: "not_started" as const };
   const question = getStageAQuestion(moduleId);
   const tasks = activeSession.courseVersion === 3 ? getCourseTasks(activeSession.stage, moduleId) : [];
+  const expressionReview = moduleId === "A5" && activeSession.stage === "A" && tasks.length > 0;
+  const expressionsReady = tasks.every((task) => isExpressionReviewed(activeResult.items?.[task.id]));
   const selectedTask = tasks.find((task) => task.id === activeResult.activeItemId) ?? tasks[0];
   const displayResult: AssessmentResult = selectedTask
     ? activeResult.items?.[selectedTask.id] ?? { moduleId, questionId: selectedTask.id, status: "not_started" }
@@ -105,6 +108,11 @@ export function AssessmentPage() {
   }
 
   async function selectItem(id: string) {
+    if (expressionReview) {
+      const currentItems = useAssessmentStore.getState().session?.results.find((entry) => entry.moduleId === moduleId)?.items;
+      const pending = tasks.find((task) => !isExpressionReviewed(currentItems?.[task.id]));
+      if (id !== pending?.id && !isExpressionReviewed(currentItems?.[id])) return;
+    }
     const target = tasks.find((task) => task.id === id);
     if (!target) return;
     if (!(await preloadImage(getCourseTaskImage({ ...target, ...content.taskOverrides?.[target.id] }, student?.gender)))) {
@@ -139,8 +147,8 @@ export function AssessmentPage() {
       if ("autoScores" in patch || "teacherScores" in patch) merged.finalScores = mergeFinalScores(merged.autoScores, merged.teacherScores);
       return merged;
     }) };
-    setSession(updated);
     await saveSession(updated);
+    setSession(updated);
   }
 
   async function handleRecorded(recording: AudioRecording) {
@@ -160,9 +168,16 @@ export function AssessmentPage() {
     await saveSession(updated);
   }
 
-  async function retry() { setAttemptRevision((value) => value + 1); await updateResult({ status: "not_started", startTime: undefined, endTime: undefined, duration: undefined, audioFile: undefined, transcript: undefined, rawResult: undefined, autoScores: undefined, teacherScores: undefined, finalScores: undefined }); }
+  async function retry() {
+    try {
+      await updateResult({ status: "not_started", startTime: undefined, endTime: undefined, duration: undefined, audioFile: undefined, transcript: undefined, rawResult: undefined, autoScores: undefined, teacherScores: undefined, finalScores: undefined });
+      // 先清除已保存进度，再重建组件，避免用上一轮第 4 句初始化新一轮。
+      setAttemptRevision((value) => value + 1);
+    } catch { setImageError("重测暂未开始，请再试一次。"); }
+  }
 
   async function finishAndGo(status: "completed" | "skipped" = "completed") {
+    if (expressionReview && !tasks.every((task) => isExpressionReviewed(useAssessmentStore.getState().session?.results.find((entry) => entry.moduleId === moduleId)?.items?.[task.id]))) return;
     const isLastModule = index === modules.length - 1;
     const completedAt = new Date().toISOString();
     const latest = useAssessmentStore.getState().session;
@@ -188,7 +203,7 @@ export function AssessmentPage() {
           <AssessmentHeader studentName={student?.name ?? "学生"} stage={activeSession.stage} moduleId={moduleId} current={index + 1} total={modules.length} />
           <section className="assessment-stage">{ActiveModule ? <ActiveModule studentGrade={student?.grade} studentGender={student?.gender} key={`${moduleId}-${moduleId === "A5" ? "expressions" : selectedTask?.id ?? "legacy"}-${attemptRevision}`} stage={activeSession.courseVersion === 3 ? activeSession.stage : undefined} items={activeResult.items} onSelectItem={selectItem} result={displayResult} onResultChange={updateResult} onRecorded={handleRecorded} /> : <Card><h2>模块准备中</h2><p>该模块已完成配置，交互将在后续阶段开放。</p></Card>}</section>
           {imageError && <p className="assessment-image-error" role="alert">{imageError}</p>}
-          <AssessmentFooter canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(activeResult.teacherScores && Object.keys(activeResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? displayResult.autoScores?.breathAndVoice : displayResult.autoScores?.pronunciationClarity} showIntelligentRating={false} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
+          <AssessmentFooter reviewOnly={expressionReview} nextDisabled={expressionReview && !expressionsReady} canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(activeResult.teacherScores && Object.keys(activeResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? displayResult.autoScores?.breathAndVoice : displayResult.autoScores?.pronunciationClarity} showIntelligentRating={false} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
         </div>
       </PageContainer>
       {guideOpen && <AssessmentGuide key={`${sessionId}-${moduleId}`} moduleId={moduleId} large={activeSession.stage !== "A"} onDismiss={() => void dismissGuide()} />}

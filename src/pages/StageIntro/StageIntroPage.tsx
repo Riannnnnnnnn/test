@@ -83,7 +83,7 @@ export function StageIntroPage() {
   return (
     <div className="app-shell stage-intro-page">
       <PageContainer>
-        <PageHeader actions={<Button variant="ghost" size="small" onClick={() => navigate("/profile")}>修改信息</Button>} />
+        <PageHeader actions={<Button variant="ghost" size="small" onClick={() => navigate(`/profile?edit=${encodeURIComponent(student.id)}`)}>修改信息</Button>} />
         <Card className="intro-card">
           <div className="intro-card__top"><StageBadge stage={stage} /><span>为 {student.name} 准备</span></div>
           <h1>{config.name}</h1><p className="intro-card__lead">{config.description}</p>

@@ -1,7 +1,9 @@
-import { acquireMicrophone, releaseMicrophone } from "./microphone";
+import { acquireMicrophone, releaseMicrophone, type MicrophoneProfile } from "./microphone";
 import type { AudioRecorderService, AudioRecording } from "./types";
 
 export class BrowserAudioRecorder implements AudioRecorderService {
+  constructor(private readonly microphoneProfile: MicrophoneProfile = "speech") {}
+
   private recorder?: MediaRecorder;
   private stream?: MediaStream;
   private chunks: Blob[] = [];
@@ -10,7 +12,7 @@ export class BrowserAudioRecorder implements AudioRecorderService {
   private animationFrame?: number;
 
   async start(onVolume?: (volume: number) => void): Promise<void> {
-    this.stream = await acquireMicrophone();
+    this.stream = await acquireMicrophone(this.microphoneProfile);
     this.chunks = [];
     this.recorder = new MediaRecorder(this.stream);
     this.recorder.addEventListener("dataavailable", (event) => { if (event.data.size) this.chunks.push(event.data); });
@@ -42,7 +44,7 @@ export class BrowserAudioRecorder implements AudioRecorderService {
     this.animationFrame = undefined;
     void this.audioContext?.close();
     this.audioContext = undefined;
-    if (this.stream) releaseMicrophone(this.stream);
+    if (this.stream) releaseMicrophone(this.stream, this.microphoneProfile);
     this.stream = undefined;
   }
 

@@ -147,3 +147,18 @@
 .breath__mark.is-passed i { height: 14px; background: #ffd44c; box-shadow: 0 0 10px rgba(255, 212, 76, .85); }
 @keyframes breath-mark-pop { 0% { transform: translateX(-50%) scale(.7); } 60% { transform: translateX(-50%) scale(1.3); } 100% { transform: translateX(-50%) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .pron__sparkles, .breath__mark.is-passed { animation: none !important; } .pron__sparkles { display: none; } }
+.card.expr--review { grid-template-rows: minmax(0, 1fr); }
+.expr--review .expr__picker { grid-row: 1; }
+.expr--review .expr__stage { display: flex; flex-direction: column; justify-content: center; gap: 16px; }
+.expr--review .expr__portrait { flex: 0 1 auto; align-self: center; width: min(640px, 100%); max-height: 55vh; min-height: 160px; }
+.expr__actions { text-align: center; }
+.expr__actions p { margin: 0 0 12px; color: #655581; font-weight: 700; }
+.expr__actions button { margin: 4px 6px; }
+.expr__mood:disabled { cursor: not-allowed; opacity: .55; }
+.expr-review-dialog { width: min(600px, calc(100vw - 32px)); max-height: 90vh; overflow: auto; border: 0; border-radius: 28px; padding: 28px; color: #33204d; }
+.expr-review-dialog::backdrop { background: #150b3766; backdrop-filter: blur(5px); }
+.expr-review-options { display: grid; gap: 12px; margin: 20px 0; }
+.expr-review-options label { display: flex; align-items: center; gap: 16px; padding: 18px; border: 2px solid #e1d5fa; border-radius: 18px; cursor: pointer; font-weight: 700; }
+.expr-review-options label:has(:checked) { background: #f5efff; border-color: #9563ef; }
+.expr-review-options input { width: 24px; height: 24px; accent-color: #7542c8; flex-shrink: 0; }
+@media (max-width: 900px) { .expr--review .expr__stage { grid-column: 1; grid-row: auto; } .expr--review .expr__portrait { max-height: none; } }

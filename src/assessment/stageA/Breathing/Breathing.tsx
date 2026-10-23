@@ -7,9 +7,9 @@ import { Card } from "@/components/ui";
 import { Fireworks } from "@/components/effects/Fireworks";
 import { playArrivalCelebration, playFireworkLaunch, playFireworkPop } from "@/services/audio/celebrationSound";
 import type { CSSProperties } from "react";
+import { breathDisplayLevel, breathSegments, isBreathVoiced } from "./breathLevel";
 
 type BreathState = "idle" | "connecting" | "recording" | "processing" | "done" | "error";
-const VOICE_THRESHOLD = 0.08;
 const BREATH_GRACE_MS = 300;
 const MAX_SAMPLE_GAP_MS = 250;
 
@@ -27,7 +27,7 @@ function stars(score?: number) {
 export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
   const { content } = useSiteContent();
   const module = content.modules.A2;
-  const recorder = useRef(new BrowserAudioRecorder());
+  const recorder = useRef(new BrowserAudioRecorder("breathing"));
   const volumeRef = useRef(0);
   const voicedMs = useRef(0);
   const interruptionsRef = useRef(0);
@@ -43,6 +43,7 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
   const [message, setMessage] = useState("");
   const [state, setState] = useState<BreathState>(result.autoScores?.sustainedPhonation !== undefined ? "done" : "idle");
   const [volume, setVolume] = useState(0);
+  const [moving, setMoving] = useState(false);
   const [distance, setDistance] = useState(Number(result.rawResult?.trainDistance ?? 0));
   const [sustainedSeconds, setSustainedSeconds] = useState(Number(result.rawResult?.sustainedSeconds ?? 0));
   const [interruptions, setInterruptions] = useState(Number(result.rawResult?.interruptions ?? 0));
@@ -51,7 +52,7 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
   const [arrived, setArrived] = useState(Number(result.rawResult?.trainDistance ?? 0) >= 100);
   const [bannerVisible, setBannerVisible] = useState(false);
 
-  useEffect(() => { void warmMicrophone(); }, []);
+  useEffect(() => { void warmMicrophone("breathing"); }, []);
   useEffect(() => { const currentRecorder = recorder.current; mounted.current = true; return () => { mounted.current = false; currentRecorder.cancel(); }; }, []);
   useEffect(() => { finishRef.current = finish; });
   useEffect(() => {
@@ -69,13 +70,14 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
       sampledAt.current = now;
       // 用实际经过的时间计进度；浏览器后台长时间停顿不能直接算作发声。
       const elapsedMs = Math.min(MAX_SAMPLE_GAP_MS, Math.max(0, now - previousSampleAt));
-      const voiced = currentVolume > VOICE_THRESHOLD;
+      const voiced = isBreathVoiced(currentVolume, wasVoiced.current);
       volumeSamples.current.push(currentVolume);
       // 短暂音量波动仍算同一段发声，避免小火车频繁停走。
       const graceMs = !voiced && wasVoiced.current
         ? Math.max(0, Math.min(elapsedMs, lastVoiceAt.current + BREATH_GRACE_MS - previousSampleAt))
         : 0;
       const creditedMs = voiced ? elapsedMs : graceMs;
+      setMoving(creditedMs > 0);
       if (creditedMs > 0) {
         voicedMs.current = Math.min(12000, voicedMs.current + creditedMs);
         setSustainedSeconds(Number((voicedMs.current / 1000).toFixed(1)));
@@ -107,8 +109,9 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
   }, [state]);
 
   function volumeChanged(value: number) {
-    volumeRef.current = value;
-    setVolume((current) => current * .58 + value * .42);
+    // 显示和计时读取同一个平滑值，不能各用一套音量。
+    volumeRef.current = volumeRef.current * .58 + value * .42;
+    setVolume(volumeRef.current);
   }
 
   async function start() {
@@ -128,6 +131,7 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
       wasVoiced.current = false;
       volumeSamples.current = [];
       volumeRef.current = 0;
+      setMoving(false);
       distanceRef.current = 0;
       finishing.current = false;
       await recorder.current.start(volumeChanged);
@@ -156,7 +160,7 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
       if (!voicedMs.current) { setState("error"); return; }
       const voicedDuration = Number((voicedMs.current / 1000).toFixed(1));
       const interruptionCount = interruptionsRef.current;
-      const samples = volumeSamples.current.filter((value) => value > VOICE_THRESHOLD);
+      const samples = volumeSamples.current.filter((value) => isBreathVoiced(value, true));
       const average = samples.length ? samples.reduce((sum, value) => sum + value, 0) / samples.length : 0;
       const variance = samples.length ? samples.reduce((sum, value) => sum + (value - average) ** 2, 0) / samples.length : 1;
       const sustainedPhonation = Math.min(100, Math.round((voicedDuration / 12) * 100));
@@ -182,14 +186,15 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
   const helperText = active ? `已持续 ${sustainedSeconds.toFixed(1)} 秒 · 中断 ${interruptions} 次` : message;
   const consoleState = state === "recording" ? "listening" : state;
   const progress = Math.min(1, Math.max(0, distance / 100));
-  const litSegments = Math.round(Math.min(1, volume * 1.9) * 10);
+  const displayLevel = breathDisplayLevel(volume);
+  const litSegments = breathSegments(volume);
   const dimensionItems = breathDimensions.map(({ key, label }) => ({ key, label, done: currentScores?.[key] !== undefined, stars: stars(currentScores?.[key]) }));
   const micLabel = active ? "正在收音" : state === "connecting" || state === "processing" ? "请稍候" : state === "done" ? "再测一次" : "点击发声";
   const nearGoal = active && progress >= .8 && progress < 1;
   const headline = arrived && (state === "processing" || state === "done") ? "火车到站啦！你真棒" : active ? (nearGoal ? "快到站了，再坚持一下！" : "正在听你持续发声") : state === "connecting" ? "正在准备收音" : state === "processing" ? "正在分析气息" : state === "done" ? "气息评测完成" : state === "error" ? "没有听到声音，再试一次" : "准备好就出发";
-  const sceneStyle = { "--p": progress.toFixed(4), "--lv": Math.min(1, volume * 1.6).toFixed(3) } as CSSProperties;
+  const sceneStyle = { "--p": progress.toFixed(4), "--lv": displayLevel.toFixed(3) } as CSSProperties;
 
-  return <Card className={`pro-card breath ${active ? "is-active" : ""} ${volume > .08 ? "is-voiced" : ""} ${arrived ? "is-arrived" : ""} ${bannerVisible ? "is-celebrating" : ""}`}>
+  return <Card className={`pro-card breath ${active ? "is-active" : ""} ${active && moving ? "is-voiced" : ""} ${arrived ? "is-arrived" : ""} ${bannerVisible ? "is-celebrating" : ""}`}>
     <div className="breath__scene" style={sceneStyle}>
       <div className="breath__hud">
         <div className="breath-stat breath-stat--main"><span>持续发声</span><strong><b>{sustainedSeconds.toFixed(1)}</b><small>秒</small></strong><em className="breath-stat__goal"><i style={{ width: `${Math.min(100, sustainedSeconds / 12 * 100)}%` }} /></em></div>
@@ -202,10 +207,10 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
       <div className="breath__track">
         <div className="breath__rail"><span className="breath__trail" /></div>
         {[3, 6, 9].map((second) => <span className={`breath__mark ${progress >= second / 12 ? "is-passed" : ""}`} key={second} style={{ "--k": second / 12 } as CSSProperties}><i />{second}s</span>)}
-        <span className={`breath__train ${module.imageUrl ? "has-image" : ""} ${volume > .08 ? "is-moving" : ""}`}>{module.imageUrl ? <><img src={module.imageUrl} alt={module.imageAlt} /><span className="breath__speed" aria-hidden="true"><i /><i /><i /></span><span className="train-smoke train-smoke--one" aria-hidden="true" /><span className="train-smoke train-smoke--two" aria-hidden="true" /><span className="train-smoke train-smoke--three" aria-hidden="true" /></> : <><i />{module.visualText}</>}</span>
+        <span className={`breath__train ${module.imageUrl ? "has-image" : ""} ${active && moving ? "is-moving" : ""}`}>{module.imageUrl ? <><img src={module.imageUrl} alt={module.imageAlt} /><span className="breath__speed" aria-hidden="true"><i /><i /><i /></span><span className="train-smoke train-smoke--one" aria-hidden="true" /><span className="train-smoke train-smoke--two" aria-hidden="true" /><span className="train-smoke train-smoke--three" aria-hidden="true" /></> : <><i />{module.visualText}</>}</span>
         <span className={`breath__goal ${progress >= 1 ? "is-reached" : ""} ${nearGoal ? "is-near" : ""}`} aria-label={module.secondaryText}><span className="breath__flag">{module.secondaryText}</span><span className="breath__pole" aria-hidden="true" /></span>
       </div>
     </div>
-    <VoiceConsole className="breath__console" state={consoleState} level={volume} timer={`${sustainedSeconds.toFixed(1)}s`} headline={headline} hint={helperText} micLabel={micLabel} micAria={active ? "正在自动评测气息" : "开始气息评测"} onStart={start} onPrepare={() => { void warmMicrophone(); }} dimensions={dimensionItems} dimensionsAria="三个维度的智能评星" />
+    <VoiceConsole className="breath__console" state={consoleState} level={displayLevel} timer={`${sustainedSeconds.toFixed(1)}s`} headline={headline} hint={helperText} micLabel={micLabel} micAria={active ? "正在自动评测气息" : "开始气息评测"} onStart={start} onPrepare={() => { void warmMicrophone("breathing"); }} dimensions={dimensionItems} dimensionsAria="三个维度的智能评星" />
   </Card>;
 }

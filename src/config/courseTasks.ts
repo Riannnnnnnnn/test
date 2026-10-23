@@ -8,6 +8,7 @@ export interface CourseTask {
   sound?: string;
   prompt?: string;
   hint?: string;
+  examples?: string[];
 }
 
 export const smallPronunciationTasks: CourseTask[] = [
@@ -43,6 +44,12 @@ export function getCourseTaskImage(task: Pick<CourseTask, "image" | "imageFemale
 
 export const largeExpressionTask: CourseTask = {
   id: "B3-forest-announcer", projectId: "A5", title: "森林广播员", text: "森林里下雨啦！请先用着急的语气提醒小动物们躲雨，再用开心的语气告诉大家雨停了，可以出来玩。", prompt: "请把这段情境完整演出来。", hint: "说清楚发生了什么，表现两种不同语气，并配合表情和动作。",
+  examples: [
+    "不好啦，下雨啦！小动物们，快来躲雨呀！",
+    "小兔子、小松鼠，快到小屋里来，别淋湿啦！",
+    "太好啦，雨停啦！太阳公公出来啦！",
+    "小伙伴们，快出来玩吧！我们一起去看彩虹！",
+  ],
 };
 
 export function getCourseTask(id: string): CourseTask | undefined {

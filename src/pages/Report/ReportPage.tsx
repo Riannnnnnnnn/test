@@ -8,6 +8,7 @@ import { Button, Card } from "@/components/ui";
 import { abilityDimensions } from "@/config/scoring";
 import { getAbilityBand, getDimensionAnalysis, stageAReportDimensions, type AbilityBand } from "@/config/scoring/reportRules";
 import { getCourseTask } from "@/config/courseTasks";
+import { expressionReviewLabels, expressionPerformanceScore } from "@/config/expressionReviews";
 import { getGradeLabel } from "@/config/stages";
 import { decodeSharedReport, downloadReportImage, encodeSharedReport } from "@/services/export";
 import { getSession, getStudent } from "@/services/storage";
@@ -76,6 +77,11 @@ export function ReportPage() {
     session.results.forEach((result) => {
       const scores = result.finalScores ?? result.teacherScores ?? result.autoScores ?? {};
       if (session.courseVersion === 3 && result.moduleId === "A5") {
+        const expressionScore = session.stage === "A" ? expressionPerformanceScore(result.items) : undefined;
+        if (expressionScore !== undefined) {
+          (buckets.performance ??= []).push(expressionScore);
+          return;
+        }
         const observed = [scores.performance, scores.languageExpression].filter((value): value is number => value !== undefined);
         if (observed.length) (buckets.performance ??= []).push(observed.reduce((sum, value) => sum + value, 0) / observed.length);
         return;
@@ -157,6 +163,7 @@ export function ReportPage() {
       {downloadError && <p className="report-download-error" role="alert">{downloadError}</p>}
       <Card ref={reportRef} className="report-card report-card--wide"><div className="report-heading"><div><p className="eyebrow">口才能力评测报告</p><h1>{student.name} 的表达成长报告</h1><div className="report-meta"><span>{student.age} 岁</span><span>{getGradeLabel(student.grade)}</span><StageBadge stage={session.stage} /><span>{formatDate(student.assessmentDate)}</span></div></div><div className="ability-summary"><span>本次能力亮点</span><strong>{prominentNames.length ? prominentNames.slice(0, 2).join(" · ") : "等待完整观察"}</strong><b>{prominentNames.length ? "表现更为突出" : "完成评价后生成"}</b></div></div>
       {teacherIssues.length > 0 && <section className="reading-evidence reading-evidence--teacher"><h2>发音问题与练习建议</h2>{teacherIssues.map((item) => <article key={item.questionId}><h3>{/^B1-/.test(item.questionId) ? item.word : `“${item.word}”`}</h3>{item.issues.map((issue) => <p key={issue.id}>{issue.text}</p>)}</article>)}<p className="reading-evidence__closing">本次练习中，老师记录了{closingParts.join("、")}等发音练习重点。建议每天选一两个词，先听辨、再模仿，逐步练到词语和完整句子；多鼓励孩子开口，留意每次的小进步。</p></section>}
+      {session.results.some((result) => result.moduleId === "A5" && Object.values(result.items ?? {}).some((item) => expressionReviewLabels(item).length)) && <section className="reading-evidence"><h2>表情模仿 · 教师观察</h2><p>以下为老师逐个表情的观察记录。表现力按已评价表情中三个具体观察项的勾选比例汇总；“有待提升”作为练习提醒，不重复扣分。未评价的表情不计入均值，计时不参与评分。</p>{session.results.filter((result) => result.moduleId === "A5").flatMap((result) => Object.values(result.items ?? {})).filter((item) => expressionReviewLabels(item).length).map((item) => <div key={item.questionId}><h3>{getCourseTask(item.questionId)?.title ?? item.questionId}</h3><p>{expressionReviewLabels(item).join("；")}</p></div>)}</section>}
       {readingEvidence.length > 0 && <section className="reading-evidence"><h2>读音练习建议</h2><p>每天选一两个词，先慢慢读清楚，再自然地连起来读。和老师一起听、一起练，会越来越棒。</p>{readingEvidence.map((item) => {
         const evidence = item.rawResult?.evidence as XfyunIseResult | undefined;
         if (!evidence) return null;
