@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui";
 import type { AssessmentModuleProps } from "@/assessment/types";
 import { largeExpressionTask, type CourseTask } from "@/config/courseTasks";
+import { forestReviewOptions, forestSentenceReviews, type ForestSentenceReview } from "@/config/forestBroadcastReviews";
 import "./forest-broadcast.css";
 
 const SCENES = [
@@ -13,27 +14,44 @@ const SCENES = [
 
 export function ForestBroadcast({ selected, result, onResultChange }: Pick<AssessmentModuleProps, "result" | "onResultChange"> & { selected: CourseTask }) {
   const sentences = largeExpressionTask.examples!.map((fallback, i) => selected.examples?.[i]?.trim() || fallback);
-  const saved = result.rawResult?.forestBroadcast as { completed?: number; sentences?: string[] } | undefined;
-  const completed = Math.max(0, Math.min(4, Number(saved?.completed) || 0));
+  const reviews = forestSentenceReviews(result);
+  const completed = reviews.findIndex((review) => !review) < 0 ? 4 : reviews.findIndex((review) => !review);
   const [step, setStep] = useState(Math.min(completed, 3));
-  const [showCompletion, setShowCompletion] = useState(completed === 4);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [choices, setChoices] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => { if (reviewOpen) dialog.current?.showModal(); else dialog.current?.close(); }, [reviewOpen]);
   const sunny = step >= 2;
-  const done = showCompletion && completed === 4;
+  const done = completed === 4;
   function selectStep(index: number) {
     setStep(index);
-    setShowCompletion(false);
   }
-  async function advance() {
-    if (saving) return;
+  function openReview() {
+    setChoices(reviews[step]?.labels ?? []);
+    setError("");
+    setReviewOpen(true);
+  }
+  function toggleChoice(label: string) {
+    setChoices((current) => {
+      if (current.includes(label)) return current.filter((value) => value !== label);
+      return label === "有待提升" ? [label] : [...current.filter((value) => value !== "有待提升"), label];
+    });
+  }
+  async function saveReview() {
+    if (saving || !choices.length) return;
     setSaving(true); setError("");
     try {
-      await onResultChange({ status: "running", rawResult: { ...result.rawResult,
-        forestBroadcast: { completed: Math.max(completed, step + 1), sentences, updatedAt: new Date().toISOString() } } });
-      setStep(Math.min(3, step + 1));
-      setShowCompletion(step === 3);
-    } catch { setError("进度暂未保存成功，请再点一次。"); }
+      const nextReviews: Array<ForestSentenceReview | undefined> = [...reviews];
+      nextReviews[step] = { labels: choices, sentence: sentences[step], reviewedAt: new Date().toISOString() };
+      const allReviewed = nextReviews.every(Boolean);
+      const forestBroadcast = { reviews: nextReviews, completed: nextReviews.filter(Boolean).length, sentences, updatedAt: new Date().toISOString() };
+      await onResultChange({ status: allReviewed ? "completed" : "running", rawResult: { ...result.rawResult, forestBroadcast },
+        teacherScores: allReviewed ? { performance: Math.round(nextReviews.reduce((sum, review) => sum + (review?.labels.filter((label) => label !== "有待提升").length ?? 0) / 3, 0) / 4 * 100) } : undefined });
+      setReviewOpen(false);
+      if (step === completed && step < 3) setStep(step + 1);
+    } catch { setError("评价暂未保存成功，请再试一次。"); }
     finally { setSaving(false); }
   }
   return <Card className={`pro-card forest ${sunny ? "forest--sunny" : "forest--rainy"}`}>
@@ -44,13 +62,21 @@ export function ForestBroadcast({ selected, result, onResultChange }: Pick<Asses
         <div className="forest__rain" aria-hidden="true">{Array.from({ length: 18 }, (_, i) => <i key={i} style={{ left: `${i * 6}%`, animationDelay: `${i % 5 * -.3}s` }} />)}</div>
       </section>
       <section className="forest__reading">
-        <nav className="forest__steps" aria-label="四句广播">{sentences.map((_, i) => <button key={i} disabled={saving || i > completed} aria-label={`第 ${i + 1} 句`} aria-current={step === i ? "step" : undefined} onClick={() => selectStep(i)}>{i < completed ? "✓" : i + 1}</button>)}</nav>
+        <nav className="forest__steps" aria-label="四句广播">{sentences.map((_, i) => <button key={i} disabled={saving || i > completed} aria-label={`第 ${i + 1} 句${reviews[i] ? "，已评价" : ""}`} aria-current={step === i ? "step" : undefined} onClick={() => selectStep(i)}>{reviews[i] ? "✓" : i + 1}</button>)}</nav>
         <div className="forest__tone"><span className="forest__speech-icon" aria-hidden="true">{sunny ? "☀" : "☂"}</span><strong>{sunny ? "开心地说" : "着急地说"}</strong></div>
         <p className="forest__sentence" key={step}>{sentences[step]}</p>
         {error && <p role="alert">{error}</p>}
-        <button className="pro-btn pro-btn--primary" disabled={saving} onClick={() => done && step === 3 ? selectStep(0) : void advance()}>{saving ? "保存中…" : done && step === 3 ? "再播一遍" : step === 3 ? "完成广播 ✓" : "这句读完了 →"}</button>
-        {done && <small className="forest__teacher-note" role="status">广播完成！请老师进行下方的星级评价。</small>}
+        <button className="pro-btn pro-btn--primary" disabled={saving} onClick={openReview}>{reviews[step] ? "查看或修改本句评价" : "这句读完了 · 请老师评价"}</button>
+        {done && <small className="forest__teacher-note" role="status">四句均已评价，可以点击下方“完成评测”。</small>}
       </section>
     </div>
+    <dialog ref={dialog} className="forest-review-dialog" aria-labelledby="forest-review-title" onCancel={(event) => { event.preventDefault(); if (!saving) setReviewOpen(false); }}>
+      <h2 id="forest-review-title">老师评价 · 第 {step + 1} 句</h2>
+      <p className="forest-review-dialog__sentence">{sentences[step]}</p>
+      <p>请选择孩子这句的表现，可多选，至少选一项。</p>
+      <div className="forest-review-dialog__options" role="group" aria-label="本句教师评价">{forestReviewOptions[step].map((label) => <label key={label}><input type="checkbox" checked={choices.includes(label)} disabled={saving} onChange={() => toggleChoice(label)} /><span>{label}</span></label>)}</div>
+      {error && <p role="alert">{error}</p>}
+      <div className="forest-review-dialog__actions"><button className="pro-btn pro-btn--ghost" disabled={saving} onClick={() => setReviewOpen(false)}>返回</button><button className="pro-btn pro-btn--primary" disabled={saving || !choices.length} onClick={() => void saveReview()}>{saving ? "保存中…" : step === completed && step < 3 ? "保存评价，下一句" : "保存本句评价"}</button></div>
+    </dialog>
   </Card>;
 }

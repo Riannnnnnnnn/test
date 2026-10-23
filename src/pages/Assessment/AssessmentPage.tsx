@@ -13,6 +13,7 @@ import type { AudioRecording } from "@/services/audio";
 import { averageScoreRecords, mergeFinalScores } from "@/services/scoring";
 import { getCourseTasks, getCourseTaskImage } from "@/config/courseTasks";
 import { isExpressionReviewed } from "@/config/expressionReviews";
+import { forestReviewsComplete } from "@/config/forestBroadcastReviews";
 import type { AssessmentResult } from "@/types";
 import { getSession, getStudent, saveAudio, saveSession } from "@/services/storage";
 import { useAssessmentStore } from "@/stores/assessmentStore";
@@ -93,6 +94,8 @@ export function AssessmentPage() {
   const expressionReview = moduleId === "A5" && activeSession.stage === "A" && tasks.length > 0;
   const expressionsReady = tasks.every((task) => isExpressionReviewed(activeResult.items?.[task.id]));
   const selectedTask = tasks.find((task) => task.id === activeResult.activeItemId) ?? tasks[0];
+  const forestReview = moduleId === "A5" && activeSession.stage === "B" && Boolean(selectedTask);
+  const forestReady = forestReviewsComplete(activeResult.items?.[selectedTask?.id ?? ""]);
   const displayResult: AssessmentResult = selectedTask
     ? activeResult.items?.[selectedTask.id] ?? { moduleId, questionId: selectedTask.id, status: "not_started" }
     : activeResult;
@@ -139,7 +142,7 @@ export function AssessmentPage() {
         const items = { ...result.items, [selectedTask.id]: item };
         const values = Object.values(items);
         const autoScores = averageScoreRecords(values.map((value) => value.autoScores));
-        const teacherScores = result.teacherScores ?? averageScoreRecords(values.map((value) => value.teacherScores));
+        const teacherScores = forestReview ? averageScoreRecords(values.map((value) => value.teacherScores)) : result.teacherScores ?? averageScoreRecords(values.map((value) => value.teacherScores));
         return { ...result, items, status: "running" as const,
           autoScores, teacherScores, finalScores: mergeFinalScores(autoScores, teacherScores) };
       }
@@ -170,7 +173,7 @@ export function AssessmentPage() {
 
   async function retry() {
     try {
-      await updateResult({ status: "not_started", startTime: undefined, endTime: undefined, duration: undefined, audioFile: undefined, transcript: undefined, rawResult: undefined, autoScores: undefined, teacherScores: undefined, finalScores: undefined });
+      await updateResult({ status: "not_started", startTime: undefined, endTime: undefined, duration: undefined, audioFile: undefined, transcript: undefined, rawResult: undefined, autoScores: undefined, ...(selectedTask ? { teacherScores: undefined } : {}), finalScores: undefined });
       // 先清除已保存进度，再重建组件，避免用上一轮第 4 句初始化新一轮。
       setAttemptRevision((value) => value + 1);
     } catch { setImageError("重测暂未开始，请再试一次。"); }
@@ -178,6 +181,7 @@ export function AssessmentPage() {
 
   async function finishAndGo(status: "completed" | "skipped" = "completed") {
     if (expressionReview && !tasks.every((task) => isExpressionReviewed(useAssessmentStore.getState().session?.results.find((entry) => entry.moduleId === moduleId)?.items?.[task.id]))) return;
+    if (forestReview && !forestReviewsComplete(useAssessmentStore.getState().session?.results.find((entry) => entry.moduleId === moduleId)?.items?.[selectedTask?.id ?? ""])) return;
     const isLastModule = index === modules.length - 1;
     const completedAt = new Date().toISOString();
     const latest = useAssessmentStore.getState().session;
@@ -203,7 +207,7 @@ export function AssessmentPage() {
           <AssessmentHeader studentName={student?.name ?? "学生"} stage={activeSession.stage} moduleId={moduleId} current={index + 1} total={modules.length} />
           <section className="assessment-stage">{ActiveModule ? <ActiveModule studentGrade={student?.grade} studentGender={student?.gender} key={`${moduleId}-${moduleId === "A5" ? "expressions" : selectedTask?.id ?? "legacy"}-${attemptRevision}`} stage={activeSession.courseVersion === 3 ? activeSession.stage : undefined} items={activeResult.items} onSelectItem={selectItem} result={displayResult} onResultChange={updateResult} onRecorded={handleRecorded} /> : <Card><h2>模块准备中</h2><p>该模块已完成配置，交互将在后续阶段开放。</p></Card>}</section>
           {imageError && <p className="assessment-image-error" role="alert">{imageError}</p>}
-          <AssessmentFooter reviewOnly={expressionReview} nextDisabled={expressionReview && !expressionsReady} canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(activeResult.teacherScores && Object.keys(activeResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? displayResult.autoScores?.breathAndVoice : displayResult.autoScores?.pronunciationClarity} showIntelligentRating={false} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
+<AssessmentFooter reviewOnly={expressionReview || forestReview} retryOnly={forestReview} nextDisabled={expressionReview && !expressionsReady || forestReview && !forestReady} canGoBack={index > 0} isLast={index === modules.length - 1} hasEvaluation={Boolean(activeResult.teacherScores && Object.keys(activeResult.teacherScores).length)} intelligentScore={moduleId === "A2" ? displayResult.autoScores?.breathAndVoice : displayResult.autoScores?.pronunciationClarity} showIntelligentRating={false} onBack={() => navigate(`/assessment/${activeSession.id}/${modules[index - 1]}`)} onNext={() => finishAndGo()} onRetry={retry} onSkip={() => finishAndGo("skipped")} onScore={() => setScoringOpen(true)} />
         </div>
       </PageContainer>
       {guideOpen && <AssessmentGuide key={`${sessionId}-${moduleId}`} moduleId={moduleId} large={activeSession.stage !== "A"} onDismiss={() => void dismissGuide()} />}

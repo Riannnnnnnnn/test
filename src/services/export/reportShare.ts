@@ -1,4 +1,5 @@
 import type { GradeLevel, StageId } from "@/types";
+import type { ForestSentenceReview } from "@/config/forestBroadcastReviews";
 
 export interface SharedReportPayload {
   version: 1;
@@ -11,6 +12,7 @@ export interface SharedReportPayload {
   };
   stage: StageId;
   abilityValues: Record<string, number>;
+  forestReviews?: Array<ForestSentenceReview | undefined>;
 }
 
 function toBase64Url(value: string): string {

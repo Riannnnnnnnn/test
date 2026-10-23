@@ -1,4 +1,17 @@
 import { abilityDimensions } from "./index";
+import type { AssessmentResult } from "@/types";
+import { mergeFinalScores } from "@/services/scoring";
+
+/** 新课件正音：先汇总老师的三个观察维度，再与有效智能分等权合并。 */
+export function pronunciationReportScore(result: AssessmentResult): number | undefined {
+  const score = mergeFinalScores(result.autoScores, result.teacherScores).pronunciationClarity
+    ?? result.finalScores?.pronunciationClarity;
+  if (score !== undefined) return score;
+  const legacyParts = ["initialStrength", "vowelFullness", "finalClosure"]
+    .map((key) => result.finalScores?.[key])
+    .filter((value): value is number => value !== undefined && Number.isFinite(value));
+  return legacyParts.length ? Math.round(legacyParts.reduce((sum, value) => sum + value, 0) / legacyParts.length) : undefined;
+}
 
 export const stageAReportDimensions = [
   "pronunciationClarity",
@@ -28,6 +41,7 @@ export function getDimensionAnalysis(dimension: (typeof stageAReportDimensions)[
 export type AbilityBand = "突出能力" | "表现较为普通" | "正在发展";
 
 export function getAbilityBand(score: number, highest: number, average: number): AbilityBand {
+  if (score < 60) return "正在发展";
   if (score >= 70 && score >= highest - 5) return "突出能力";
   if (score >= average - 10) return "表现较为普通";
   return "正在发展";

@@ -11,6 +11,7 @@ import { breathDisplayLevel, breathSegments, isBreathVoiced } from "./breathLeve
 
 type BreathState = "idle" | "connecting" | "recording" | "processing" | "done" | "error";
 const BREATH_GRACE_MS = 300;
+const BREATH_ONSET_MS = 200;
 const MAX_SAMPLE_GAP_MS = 250;
 
 const breathDimensions = [
@@ -32,6 +33,7 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
   const voicedMs = useRef(0);
   const interruptionsRef = useRef(0);
   const wasVoiced = useRef(false);
+  const onsetMs = useRef(0);
   const volumeSamples = useRef<number[]>([]);
   const mounted = useRef(true);
   const finishing = useRef(false);
@@ -70,7 +72,9 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
       sampledAt.current = now;
       // 用实际经过的时间计进度；浏览器后台长时间停顿不能直接算作发声。
       const elapsedMs = Math.min(MAX_SAMPLE_GAP_MS, Math.max(0, now - previousSampleAt));
-      const voiced = isBreathVoiced(currentVolume, wasVoiced.current);
+      const aboveThreshold = isBreathVoiced(currentVolume, wasVoiced.current);
+      onsetMs.current = aboveThreshold ? Math.min(BREATH_ONSET_MS, onsetMs.current + elapsedMs) : 0;
+      const voiced = aboveThreshold && (wasVoiced.current || onsetMs.current >= BREATH_ONSET_MS);
       volumeSamples.current.push(currentVolume);
       // 短暂音量波动仍算同一段发声，避免小火车频繁停走。
       const graceMs = !voiced && wasVoiced.current
@@ -119,7 +123,7 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
     setState("connecting");
     setMessage("");
     try {
-      await onResultChange({ status: "running", autoScores: undefined, teacherScores: undefined, rawResult: undefined });
+      await onResultChange({ status: "running", autoScores: undefined, rawResult: undefined });
       if (!mounted.current) return;
       setDistance(0);
       setArrived(false);
@@ -129,6 +133,7 @@ export function Breathing({ onResultChange, result }: AssessmentModuleProps) {
       voicedMs.current = 0;
       interruptionsRef.current = 0;
       wasVoiced.current = false;
+      onsetMs.current = 0;
       volumeSamples.current = [];
       volumeRef.current = 0;
       setMoving(false);

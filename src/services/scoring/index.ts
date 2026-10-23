@@ -7,12 +7,21 @@ export function weightedScore(scores: Record<string, number>, weights: Record<st
 
 export function mergeFinalScores(autoScores?: Record<string, number>, teacherScores?: Record<string, number>): Record<string, number> {
   const keys = new Set([...Object.keys(autoScores ?? {}), ...Object.keys(teacherScores ?? {})]);
-  return Object.fromEntries([...keys].map((key) => {
+  const merged = Object.fromEntries([...keys].map((key) => {
     const automatic = autoScores?.[key];
     const teacher = teacherScores?.[key];
     if (automatic !== undefined && teacher !== undefined) return [key, Math.round((automatic + teacher) / 2)];
     return [key, teacher ?? automatic ?? 0];
   }));
+  const teacherArticulation = ["initialStrength", "vowelFullness", "finalClosure"]
+    .map((key) => teacherScores?.[key])
+    .filter((score): score is number => score !== undefined && Number.isFinite(score));
+  if (teacherArticulation.length) {
+    const teacherMean = Math.round(teacherArticulation.reduce((sum, score) => sum + score, 0) / teacherArticulation.length);
+    const automatic = autoScores?.pronunciationClarity;
+    merged.pronunciationClarity = automatic === undefined ? teacherMean : Math.round((automatic + teacherMean) / 2);
+  }
+  return merged;
 }
 
 export function averageScoreRecords(records: Array<Record<string, number> | undefined>): Record<string, number> | undefined {

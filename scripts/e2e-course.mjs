@@ -50,6 +50,20 @@ try {
   assert.equal(pronunciationChecks.mismatch.scores.pronunciationClarity, undefined);
   assert.equal(pronunciationChecks.fourStarBoundary, 4);
   assert.equal(pronunciationChecks.review.kind, 'reading');
+  const reportScoreChecks = await page.evaluate(async () => {
+    const { pronunciationReportScore, getAbilityBand } = await import('/src/config/scoring/reportRules.ts');
+    const { mergeFinalScores } = await import('/src/services/scoring/index.ts');
+    const base = { moduleId: 'A1', questionId: 'A1-001', status: 'completed' };
+    return {
+      combined: pronunciationReportScore({ ...base, autoScores: { pronunciationClarity: 90 }, teacherScores: { initialStrength: 60, vowelFullness: 80, finalClosure: 100 } }),
+      automaticOnly: pronunciationReportScore({ ...base, autoScores: { pronunciationClarity: 90 } }),
+      teacherOnly: pronunciationReportScore({ ...base, teacherScores: { initialStrength: 60, vowelFullness: 80, finalClosure: 100 } }),
+      stored: mergeFinalScores({ pronunciationClarity: 90 }, { initialStrength: 60, vowelFullness: 80, finalClosure: 100 }).pronunciationClarity,
+      zeroBand: getAbilityBand(0, 0, 0),
+      legacyOnly: pronunciationReportScore({ ...base, finalScores: { initialStrength: 60, vowelFullness: 80, finalClosure: 100 } }),
+    };
+  });
+  assert.deepEqual(reportScoreChecks, { combined: 85, automaticOnly: 90, teacherOnly: 80, stored: 85, zeroBand: '正在发展', legacyOnly: 80 });
   const resultCues = await page.evaluate(async () => {
     const { resultCueNotes } = await import('/src/services/audio/resultCues.ts');
     return Array.from({ length: 6 }, (_, stars) => resultCueNotes(stars).map(Math.round));
@@ -201,9 +215,13 @@ try {
     const { breathSegments, isBreathVoiced } = await import('/src/assessment/stageA/Breathing/breathLevel.ts');
     return [0, .02, .03, .045, .07].map(value => [breathSegments(value), isBreathVoiced(value, false)]);
   });
-  assert.deepEqual(breathChecks, [[0, false], [2, false], [3, true], [4, true], [5, true]]);
+  assert.deepEqual(breathChecks, [[0, false], [2, false], [3, false], [4, true], [5, true]]);
+  assert.equal(await page.evaluate(async () => (await import('/src/assessment/stageA/Breathing/breathLevel.ts')).isBreathVoiced(.02, true)), false);
+  assert.equal(await page.evaluate(async () => (await import('/src/assessment/stageA/Breathing/breathLevel.ts')).isBreathVoiced(.03, true)), false);
   await button('开始气息评测').click();
   await page.getByText('发声已停止，评测完成', { exact: true }).waitFor({ timeout: 12000 });
+  await button('教师星级评价').click();
+  await button('保存评价').click();
   await page.evaluate(() => { globalThis.silenceAfter = undefined; globalThis.testMicrophoneGain.gain.value = .24; });
   await button('开始气息评测').click();
   assert(await page.evaluate(() => globalThis.microphoneRequests.at(-1)?.audio?.noiseSuppression === false));
@@ -213,6 +231,16 @@ try {
   assert(await page.getByText('到站啦！', { exact: true }).isVisible());
   assert(Number(await page.locator('.breath-stat').nth(1).locator('b').textContent()) <= 1);
   await screenshot('气息-自动结束');
+  assert(await button('已完成教师评价').isVisible());
+  await button('重测').click();
+  await page.getByText('准备好就出发', { exact: true }).waitFor();
+  assert(await button('已完成教师评价').isVisible());
+  assert(await page.evaluate(async () => {
+    const db = await import('/src/services/storage/database.ts');
+    const saved = await db.getSession(location.pathname.split('/')[2]);
+    const breath = saved.results.find((entry) => entry.moduleId === 'A2');
+    return !breath.autoScores && breath.teacherScores?.sustainedPhonation === 60 && breath.finalScores?.sustainedPhonation === 60;
+  }));
   console.log('PASS 小火车停声和到达终点自动结算');
   await button('下一项').click();
   await button('下一步 →').click();
@@ -345,7 +373,7 @@ try {
   assert.equal(await page.locator('.breath-stat').count(), 3);
   await page.evaluate(() => { globalThis.silenceAfter = 1200; });
   await button('开始气息评测').click();
-  assert(await page.locator('.breath.is-active').isVisible());
+  await page.locator('.breath.is-active').waitFor({ timeout: 5000 });
   await page.getByText('发声已停止，评测完成', { exact: true }).waitFor({ timeout: 12000 });
   await page.evaluate(() => { globalThis.silenceAfter = undefined; });
   await page.goto(baseUrl + '/assessment/test-large/A5'); await skip();
@@ -355,36 +383,50 @@ try {
   assert.equal(await page.locator('.forest__art').count(), 4);
   assert.match(await page.locator('.forest__art.is-visible').getAttribute('src'), /rain-start.webp$/);
   assert(await button('第 4 句').isDisabled());
-  for (let i = 0; i < 3; i++) {
-    await button('这句读完了 →').click();
-    await page.locator('.forest__steps button[aria-current="step"]').filter({ hasText: String(i + 2) }).waitFor();
-    const art = page.locator('.forest__art.is-visible');
-    assert.match(await art.getAttribute('src'), new RegExp(['rainy', 'sunny', 'rainbow-play'][i] + '.webp$'));
-    await art.evaluate(img => img.decode());
+  assert.equal(await button('教师星级评价').count(), 0);
+  assert(await button('完成评测').isDisabled());
+  for (let i = 0; i < 4; i++) {
+    await button('这句读完了 · 请老师评价').click();
+    const review = page.getByRole('dialog', { name: `老师评价 · 第 ${i + 1} 句` });
+    assert.equal(await review.locator('input[type="checkbox"]').count(), 4);
+    assert(await button('完成评测').isDisabled());
+    await review.locator('input[type="checkbox"]').first().check();
+    await review.getByRole('button', { name: i === 3 ? '保存本句评价' : '保存评价，下一句' }).click();
+    await review.waitFor({ state: 'hidden' });
+    if (i < 3) {
+      await page.locator('.forest__steps button[aria-current="step"]').filter({ hasText: String(i + 2) }).waitFor();
+      const art = page.locator('.forest__art.is-visible');
+      assert.match(await art.getAttribute('src'), new RegExp(['rainy', 'sunny', 'rainbow-play'][i] + '.webp$'));
+      await art.evaluate(img => img.decode());
+    }
   }
   assert(await page.locator('.forest--sunny').isVisible());
   await screenshot('森林广播-放晴');
-  await button('完成广播 ✓').click();
-  await button('再播一遍').waitFor();
+  assert(await button('完成评测').isEnabled());
   await page.reload();
-  await button('再播一遍').waitFor();
-  await button('第 2 句').click();
+  assert(await button('完成评测').isEnabled());
+  await page.getByRole('button', { name: /^第 2 句/ }).click();
   assert.match(await page.locator('.forest__art.is-visible').getAttribute('src'), /rainy.webp$/);
-  assert.equal(await page.getByText('广播完成！请老师进行下方的星级评价。').count(), 0);
-  await button('第 4 句').click();
-  await button('完成广播 ✓').click();
-  await button('再播一遍').click();
-  assert.match(await page.locator('.forest__art.is-visible').getAttribute('src'), /rain-start.webp$/);
-  assert.equal(await page.getByText('广播完成！请老师进行下方的星级评价。').count(), 0);
-  await button('第 4 句').click();
+  assert(await button('查看或修改本句评价').isVisible());
+  await page.getByRole('button', { name: /^第 4 句/ }).click();
+  await button('完成评测').click();
+  await page.getByRole('heading', { name: '森林广播 · 逐句教师评价' }).waitFor();
+  assert.equal(await page.locator('.reading-evidence').filter({ hasText: '森林广播 · 逐句教师评价' }).locator('article').count(), 4);
+  assert.equal(await page.locator('.ability-observations > div').filter({ hasText: '表现力' }).getByText('待观察').count(), 0);
+  const sharedForestReport = await page.locator('.report-qr-panel__code').getAttribute('data-share-url');
+  assert.equal(await page.locator('.ability-observations > div').filter({ hasText: '表现力' }).locator('i').evaluate((el) => el.style.width), '33%');
+  await page.goto(sharedForestReport);
+  await page.getByRole('heading', { name: '森林广播 · 逐句教师评价' }).waitFor();
+  assert.equal(await page.locator('.reading-evidence').filter({ hasText: '森林广播 · 逐句教师评价' }).locator('article').count(), 4);
+  await page.goto(baseUrl + '/assessment/test-large/A5');
+  await page.getByRole('button', { name: /^第 4 句/ }).click();
   await button('重测').click();
   await page.locator('.forest__steps button[aria-current="step"]').filter({ hasText: '1' }).waitFor();
   assert(await button('第 2 句').isDisabled());
-  assert(await button('这句读完了 →').isVisible());
-  assert.equal(await button('完成广播 ✓').count(), 0);
+  assert(await button('这句读完了 · 请老师评价').isVisible());
+  assert(await button('完成评测').isDisabled());
   await page.reload();
   assert.equal(await page.locator('.forest__sentence').innerText(), '不好啦，下雨啦！小动物们，快来躲雨呀！');
-  await button('教师星级评价').click(); await button('保存评价').click();
   await page.setViewportSize({ width: 390, height: 844 });
   await button('评测说明').click(); await screenshot('手机说明'); await skip();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
