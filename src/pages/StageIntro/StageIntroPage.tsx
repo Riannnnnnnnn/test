@@ -58,8 +58,8 @@ export function StageIntroPage() {
     shutdownMicrophone();
   }
 
-  async function startAssessment() {
-    if (!student || config.availability !== "available" || !microphonePassed) return;
+  async function startAssessment(previewOnly = false) {
+    if (!student || config.availability !== "available" || (!microphonePassed && !(import.meta.env.DEV && previewOnly))) return;
     setStarting(true);
     setImageError("");
     const firstImage = assessmentImageUrls(stage, config.moduleIds[0], content, student.gender)[0];
@@ -68,13 +68,18 @@ export function StageIntroPage() {
       setStarting(false);
       return;
     }
-    const session: AssessmentSession = {
+    try {
+      const session: AssessmentSession = {
       id: createId("session"), studentId: student.id, stage, courseVersion: 3, startTime: new Date().toISOString(), status: "running",
       results: config.moduleIds.map((moduleId) => ({ moduleId, questionId: `${moduleId}-001`, status: "not_started" })),
-    };
-    await saveSession(session);
-    setSession(session);
-    navigate(`/assessment/${session.id}/${config.moduleIds[0]}`);
+      };
+      await saveSession(session);
+      setSession(session);
+      navigate(`/assessment/${session.id}/${config.moduleIds[0]}`);
+    } catch {
+      setImageError("评测暂时无法开始，请检查浏览器存储权限后重试。");
+      setStarting(false);
+    }
   }
 
   if (loading) return <div className="app-shell"><PageContainer><p className="loading-state">正在读取评测资料…</p></PageContainer></div>;
@@ -108,8 +113,10 @@ export function StageIntroPage() {
           {imageError && <p className="assessment-image-error" role="alert">{imageError}</p>}
           <div className="microphone-check-dialog__footer">
             <Button variant="secondary" onClick={closeMicrophoneDialog} disabled={starting}>稍后再测</Button>
-            <Button onClick={startAssessment} disabled={!microphonePassed || starting}>{starting ? "正在准备评测…" : "进入评测"}</Button>
+            {import.meta.env.DEV && <Button variant="secondary" onClick={() => void startAssessment(true)} disabled={starting}>跳过，预览页面</Button>}
+            <Button onClick={() => void startAssessment()} disabled={!microphonePassed || starting}>{starting ? "正在准备评测…" : "进入评测"}</Button>
           </div>
+          {import.meta.env.DEV && <p>本地预览可跳过麦克风测试，语音评分需要安全连接及正常收音。</p>}
         </div>
       </dialog>}
     </div>

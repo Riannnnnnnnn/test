@@ -70,7 +70,8 @@ export function StudentProfilePage() {
       return;
     }
     setSaving(true);
-    const student: StudentProfile = {
+    try {
+      const student: StudentProfile = {
       ...editingStudent,
       id: editingStudent?.id ?? createId("student"),
       name: form.name.trim(),
@@ -80,13 +81,13 @@ export function StudentProfilePage() {
       assessmentDate: editingStudent?.assessmentDate ?? new Date().toISOString(),
       recommendedStage: recommendedStage!,
       selectedStage: activeStage,
-    };
-    try {
+      };
       await saveStudent(student);
       setStudent(student);
       navigate(`/stage/${activeStage}/intro?student=${encodeURIComponent(student.id)}`);
     } catch {
       setError("资料暂时无法保存，请检查浏览器存储权限后重试。");
+    } finally {
       setSaving(false);
     }
   }

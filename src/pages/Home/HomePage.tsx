@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useFullscreen } from "@/components/layout/useFullscreen";
 import { useNavigate } from "react-router-dom";
 import { PageContainer, PageHeader } from "@/components/layout";
 import { Button } from "@/components/ui";
@@ -9,30 +9,14 @@ import "@/styles/motion.css";
 export function HomePage() {
   const navigate = useNavigate();
   const { content } = useSiteContent();
-  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
-  const [fullscreenError, setFullscreenError] = useState("");
+  const { toggleFullscreen, focusMode, fullscreenLabel, fullscreenMessage } = useFullscreen();
 
-  useEffect(() => {
-    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", syncFullscreen);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
-  }, []);
-
-  async function toggleFullscreen() {
-    setFullscreenError("");
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else await document.documentElement.requestFullscreen();
-    } catch {
-      setFullscreenError("无法切换全屏，请检查浏览器是否允许全屏显示。");
-    }
-  }
 
   return (
-    <div className="app-shell home-page">
+    <div className={`app-shell home-page ${focusMode ? "is-focus-mode" : ""}`}>
       <PageContainer>
-        <PageHeader actions={<Button variant="ghost" size="small" onClick={() => void toggleFullscreen()}>{isFullscreen ? "退出全屏" : "全屏"}</Button>} />
-        {fullscreenError && <p role="alert">{fullscreenError}</p>}
+        <PageHeader actions={<Button variant="ghost" size="small" onClick={() => void toggleFullscreen()}>{fullscreenLabel}</Button>} />
+        {fullscreenMessage && <p role="status">{fullscreenMessage}</p>}
         <main className="home-main"><section className="hero">
           <div className="hero__copy">
             <p className="eyebrow hero__eyebrow">{content.home.eyebrow}</p>

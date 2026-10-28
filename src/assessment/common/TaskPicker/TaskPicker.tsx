@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { CourseTask } from "@/config/courseTasks";
 import type { AssessmentResult } from "@/types";
 import type { XfyunIseResult } from "@/services/speech/xfyunIse";
@@ -7,6 +8,17 @@ export function TaskPicker({ tasks, selectedId, items, onSelect, initials = fals
   tasks: CourseTask[]; selectedId: string; items?: Record<string, AssessmentResult>;
   onSelect?: (id: string) => void | Promise<void>; initials?: boolean;
 }) {
+  const buttonsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const list = buttonsRef.current;
+    const selected = list?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!list || !selected || list.scrollWidth <= list.clientWidth) return;
+    const bounds = list.getBoundingClientRect();
+    const item = selected.getBoundingClientRect();
+    // Move only the horizontal picker, never the entire lesson page.
+    if (item.left < bounds.left) list.scrollLeft += item.left - bounds.left;
+    else if (item.right > bounds.right) list.scrollLeft += item.right - bounds.right;
+  }, [selectedId]);
   // 只有 0 颗星（没听清或读错）算错误；1–5 颗星都显示 ✓。
   const status = (id: string): "done" | "wrong" | "pending" => {
     const item = items?.[id];
@@ -23,7 +35,7 @@ export function TaskPicker({ tasks, selectedId, items, onSelect, initials = fals
     <p><span className="course-task-picker__title">{initials ? "声母" : "题目"}</span>
       <span className="course-task-picker__meter" aria-hidden="true"><i style={{ width: `${tasks.length ? done / tasks.length * 100 : 0}%` }} /></span>
       <small>已评测 <b>{done}</b> / {tasks.length}</small></p>
-    <div className="course-task-picker__buttons">{tasks.map((task) => {
+    <div ref={buttonsRef} className="course-task-picker__buttons">{tasks.map((task) => {
       const itemStatus = status(task.id);
       return <button type="button" key={task.id}
         aria-pressed={selectedId === task.id} aria-label={initials ? `${task.title}：${task.text}，${itemStatus === "wrong" ? "0 颗星，点击查看" : itemStatus === "done" ? "已评测" : "未评测"}` : task.title}
